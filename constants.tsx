@@ -19,7 +19,7 @@ export const MOCK_SHOPS: Shop[] = [
     address: '123 Main St, Tech City',
     gstNumber: '22AAAAA0000A1Z5',
     isApproved: true,
-    adminCommissionRate: 0.015
+    adminCommissionRate: 0.10 // 10% of the commission amount
   }
 ];
 

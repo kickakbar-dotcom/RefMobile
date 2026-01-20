@@ -11,6 +11,18 @@ export enum TransactionStatus {
   REJECTED = 'REJECTED'
 }
 
+export enum LeadStatus {
+  PENDING = 'PENDING',
+  CONVERTED = 'CONVERTED',
+  REJECTED = 'REJECTED'
+}
+
+export enum ComplaintStatus {
+  PENDING = 'PENDING',
+  RESOLVED = 'RESOLVED',
+  DISMISSED = 'DISMISSED'
+}
+
 export interface User {
   id: string;
   name: string;
@@ -30,7 +42,10 @@ export interface Shop {
   address: string;
   gstNumber: string;
   isApproved: boolean;
-  adminCommissionRate: number; // 1-2%
+  adminCommissionRate: number; // 0.05 - 0.10 (5% to 10% of the product commission)
+  gstCertificatePhoto?: string;
+  shopPhoto?: string;
+  ownerSelfiePhoto?: string;
 }
 
 export interface Product {
@@ -39,7 +54,9 @@ export interface Product {
   name: string;
   brand: string;
   price: number;
-  customerCommission: number; // Flat or %? Prompt says "commission margin"
+  customerCommission: number; // Total commission set by shop owner
+  frontImage?: string; // Base64 string
+  backImage?: string;  // Base64 string
 }
 
 export interface ReferralSale {
@@ -63,6 +80,7 @@ export interface PayoutRequest {
   upiId: string;
   status: TransactionStatus;
   screenshotUrl?: string;
+  transactionId?: string;
   timestamp: number;
   type: 'CUSTOMER_PAYOUT' | 'SHOP_TO_ADMIN_PAYOUT';
 }
@@ -73,5 +91,26 @@ export interface AdminRequest {
   title: string;
   message: string;
   status: 'UNREAD' | 'READ';
+  timestamp: number;
+}
+
+export interface Lead {
+  id: string;
+  customerId: string;
+  shopId: string;
+  productId: string;
+  referralName: string;
+  referralMobile: string;
+  status: LeadStatus;
+  timestamp: number;
+}
+
+export interface Complaint {
+  id: string;
+  customerId: string;
+  shopId: string;
+  subject: string;
+  message: string;
+  status: ComplaintStatus;
   timestamp: number;
 }

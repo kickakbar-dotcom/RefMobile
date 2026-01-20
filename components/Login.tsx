@@ -19,8 +19,22 @@ const Login: React.FC<LoginProps> = ({ onLogin, onRegisterShop }) => {
     shopName: '',
     mobile: '',
     address: '',
-    gstNumber: ''
+    gstNumber: '',
+    gstCertificatePhoto: '',
+    shopPhoto: '',
+    ownerSelfiePhoto: ''
   });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setRegData(prev => ({ ...prev, [field]: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,12 +43,16 @@ const Login: React.FC<LoginProps> = ({ onLogin, onRegisterShop }) => {
 
   const handleRegisterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!regData.gstCertificatePhoto || !regData.shopPhoto || !regData.ownerSelfiePhoto) {
+      alert("Please upload all required documents (GSTIN, Shop Photo, and Selfie)");
+      return;
+    }
     onRegisterShop(regData);
     setActiveTab('login');
   };
 
   return (
-    <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden mt-8">
+    <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden mt-8 mb-12">
       <div className="flex border-b">
         <button 
           onClick={() => setActiveTab('login')}
@@ -74,13 +92,13 @@ const Login: React.FC<LoginProps> = ({ onLogin, onRegisterShop }) => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {role === UserRole.ADMIN ? 'Email Address' : 'Mobile Number'}
+                {role === UserRole.ADMIN ? 'Admin Code' : 'Mobile Number'}
               </label>
               <input 
-                type={role === UserRole.ADMIN ? 'email' : 'tel'}
+                type={role === UserRole.ADMIN ? 'text' : 'tel'}
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                placeholder={role === UserRole.ADMIN ? 'kickakbar@gmail.com' : 'Enter 10-digit number'}
+                placeholder={role === UserRole.ADMIN ? 'Enter Admin Code' : 'Enter 10-digit number'}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all outline-none"
                 required
               />
@@ -110,7 +128,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onRegisterShop }) => {
             <div className="mt-4 p-4 bg-gray-50 rounded-lg text-xs text-gray-500 border border-gray-100">
               <p className="font-bold mb-1 uppercase tracking-wider">Demo Access:</p>
               <ul className="space-y-1">
-                <li>Admin: kickakbar@gmail.com / Akbar@7576</li>
+                <li>Admin Code: kickakbar@gmail.com / Akbar@7576</li>
                 <li>Shop: 8888888888</li>
                 <li>Customer: 7777777777</li>
               </ul>
@@ -122,38 +140,71 @@ const Login: React.FC<LoginProps> = ({ onLogin, onRegisterShop }) => {
             
             <input 
               placeholder="Owner Full Name"
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
               onChange={e => setRegData({...regData, ownerName: e.target.value})}
               required
             />
             <input 
               placeholder="Shop Name"
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
               onChange={e => setRegData({...regData, shopName: e.target.value})}
               required
             />
             <input 
               placeholder="Mobile Number"
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
               onChange={e => setRegData({...regData, mobile: e.target.value})}
               required
             />
             <input 
               placeholder="Address"
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
               onChange={e => setRegData({...regData, address: e.target.value})}
               required
             />
             <input 
               placeholder="GST Number"
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
               onChange={e => setRegData({...regData, gstNumber: e.target.value})}
               required
             />
 
+            <div className="space-y-3 pt-2">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">GSTIN Certificate Photo</label>
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={e => handleFileChange(e, 'gstCertificatePhoto')}
+                  className="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Shop Front Photo</label>
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={e => handleFileChange(e, 'shopPhoto')}
+                  className="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Owner Selfie Photo</label>
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={e => handleFileChange(e, 'ownerSelfiePhoto')}
+                  className="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                  required
+                />
+              </div>
+            </div>
+
             <button 
               type="submit"
-              className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 active:scale-[0.98] transition-all shadow-lg shadow-blue-200"
+              className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 active:scale-[0.98] transition-all shadow-lg shadow-blue-200 mt-4"
             >
               Submit Application
             </button>

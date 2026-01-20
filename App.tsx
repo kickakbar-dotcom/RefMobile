@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, UserRole, Shop, Product, ReferralSale, PayoutRequest, TransactionStatus, AdminRequest } from './types';
+import { User, UserRole, Shop, Product, ReferralSale, PayoutRequest, TransactionStatus, AdminRequest, Lead, Complaint } from './types';
 import { MOCK_USERS, MOCK_SHOPS, INITIAL_ADMIN } from './constants';
 import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
@@ -16,6 +16,8 @@ const App: React.FC = () => {
   const [sales, setSales] = useState<ReferralSale[]>([]);
   const [payouts, setPayouts] = useState<PayoutRequest[]>([]);
   const [adminRequests, setAdminRequests] = useState<AdminRequest[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [complaints, setComplaints] = useState<Complaint[]>([]);
 
   // Simulation of persistence (optional for demo)
   useEffect(() => {
@@ -35,7 +37,7 @@ const App: React.FC = () => {
       setCurrentUser(user);
       localStorage.setItem('refmobile_user', JSON.stringify(user));
     } else {
-      alert(role === UserRole.ADMIN ? 'Invalid email or password' : 'Invalid mobile number or role');
+      alert(role === UserRole.ADMIN ? 'Invalid Admin Code or password' : 'Invalid mobile number or role');
     }
   };
 
@@ -44,7 +46,7 @@ const App: React.FC = () => {
     localStorage.removeItem('refmobile_user');
   };
 
-  const registerShop = (shopData: Partial<Shop> & { ownerName: string, mobile: string }) => {
+  const registerShop = (shopData: Partial<Shop> & { ownerName: string, mobile: string, gstCertificatePhoto: string, shopPhoto: string, ownerSelfiePhoto: string }) => {
     const newOwnerId = `owner-${Date.now()}`;
     const newShopId = `shop-${Date.now()}`;
     
@@ -63,7 +65,10 @@ const App: React.FC = () => {
       address: shopData.address || '',
       gstNumber: shopData.gstNumber || '',
       isApproved: false,
-      adminCommissionRate: 0.01
+      adminCommissionRate: 0.01,
+      gstCertificatePhoto: shopData.gstCertificatePhoto,
+      shopPhoto: shopData.shopPhoto,
+      ownerSelfiePhoto: shopData.ownerSelfiePhoto
     };
 
     setUsers(prev => [...prev, newOwner]);
@@ -85,6 +90,10 @@ const App: React.FC = () => {
             setPayouts={setPayouts}
             adminRequests={adminRequests}
             setAdminRequests={setAdminRequests}
+            complaints={complaints}
+            setComplaints={setComplaints}
+            users={users}
+            setUsers={setUsers}
           />
         );
       case UserRole.SHOP_OWNER:
@@ -114,6 +123,8 @@ const App: React.FC = () => {
             setUsers={setUsers}
             adminRequests={adminRequests.filter(r => r.shopId === myShop.id)}
             setAdminRequests={setAdminRequests}
+            leads={leads.filter(l => l.shopId === myShop.id)}
+            setLeads={setLeads}
           />
         );
       case UserRole.CUSTOMER:
@@ -128,6 +139,10 @@ const App: React.FC = () => {
             setPayouts={setPayouts}
             setUsers={setUsers}
             users={users}
+            leads={leads.filter(l => l.customerId === currentUser.id)}
+            setLeads={setLeads}
+            complaints={complaints.filter(c => c.customerId === currentUser.id)}
+            setComplaints={setComplaints}
           />
         );
       default:
