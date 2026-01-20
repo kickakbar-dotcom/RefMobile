@@ -46,6 +46,7 @@ export interface Shop {
   gstCertificatePhoto?: string;
   shopPhoto?: string;
   ownerSelfiePhoto?: string;
+  logo?: string; // Base64 shop logo
 }
 
 export interface Product {

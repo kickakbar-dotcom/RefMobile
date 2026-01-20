@@ -15,16 +15,20 @@ interface AdminDashboardProps {
   setComplaints: React.Dispatch<React.SetStateAction<Complaint[]>>;
   users: User[];
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
+  onResetPassword: (userId: string, newPass: string) => void;
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
-  shops, setShops, sales, payouts, setPayouts, adminRequests, setAdminRequests, complaints, setComplaints, users, setUsers
+  shops, setShops, sales, payouts, setPayouts, adminRequests, setAdminRequests, complaints, setComplaints, users, setUsers, onResetPassword
 }) => {
   const [requestModal, setRequestModal] = useState<{ isOpen: boolean; shopId: string }>({ isOpen: false, shopId: '' });
   const [docModal, setDocModal] = useState<{ isOpen: boolean; shop: Shop | null }>({ isOpen: false, shop: null });
   const [transferModal, setTransferModal] = useState<{ isOpen: boolean; customer: User | null }>({ isOpen: false, customer: null });
+  const [resetModal, setResetModal] = useState<{ isOpen: boolean; userId: string; ownerName: string }>({ isOpen: false, userId: '', ownerName: '' });
   const [newReq, setNewReq] = useState({ title: '', message: '' });
   const [targetShopId, setTargetShopId] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [customerSearch, setCustomerSearch] = useState('');
 
   const stats = {
     totalShops: shops.length,
@@ -42,10 +46,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const updateCommission = (id: string, rate: number) => {
     setShops(prev => prev.map(s => s.id === id ? { ...s, adminCommissionRate: rate / 100 } : s));
-  };
-
-  const handlePayoutStatus = (id: string, status: TransactionStatus) => {
-    setPayouts(prev => prev.map(p => p.id === id ? { ...p, status } : p));
   };
 
   const handleComplaintStatus = (id: string, status: ComplaintStatus) => {
@@ -73,22 +73,38 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (!transferModal.customer || !targetShopId) return;
 
     setUsers(prev => prev.map(u => u.id === transferModal.customer!.id ? { ...u, shopId: targetShopId } : u));
-    alert(`Customer ${transferModal.customer.name} transferred successfully.`);
+    alert(`Customer ${transferModal.customer.name} transferred successfully to another shop.`);
     setTransferModal({ isOpen: false, customer: null });
     setTargetShopId('');
   };
 
-  const chartData = [
-    { name: 'Mon', revenue: 4000 },
-    { name: 'Tue', revenue: 3000 },
-    { name: 'Wed', revenue: 5000 },
-    { name: 'Thu', revenue: 2780 },
-    { name: 'Fri', revenue: 1890 },
-    { name: 'Sat', revenue: 2390 },
-    { name: 'Sun', revenue: 3490 },
-  ];
+  const handleResetPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword) return;
+    onResetPassword(resetModal.userId, newPassword);
+    alert(`Password for ${resetModal.ownerName} has been reset.`);
+    setResetModal({ isOpen: false, userId: '', ownerName: '' });
+    setNewPassword('');
+  };
 
-  const customers = users.filter(u => u.role === UserRole.CUSTOMER);
+  const getCustomerEarnings = (customerId: string) => {
+    return sales
+      .filter(s => s.referrerId === customerId)
+      .reduce((acc, s) => acc + s.customerCommissionEarned, 0);
+  };
+
+  const getCustomerWithdrawals = (customerId: string) => {
+    return payouts
+      .filter(p => p.userId === customerId && p.status === TransactionStatus.PAID)
+      .reduce((acc, p) => acc + p.amount, 0);
+  };
+
+  const filteredCustomers = users.filter(u => 
+    u.role === UserRole.CUSTOMER && 
+    (u.name.toLowerCase().includes(customerSearch.toLowerCase()) || 
+     u.mobile?.includes(customerSearch) || 
+     u.referralCode?.toLowerCase().includes(customerSearch.toLowerCase()))
+  );
 
   return (
     <div className="space-y-6 pb-20">
@@ -165,63 +181,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       </section>
 
       <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
-          <h3 className="text-lg font-bold text-gray-800">Customer Management</h3>
-          <span className="text-xs font-bold text-gray-500">{stats.totalCustomers} Users</span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-gray-50 text-gray-500 text-xs font-semibold uppercase tracking-wider">
-              <tr>
-                <th className="px-6 py-4">Customer</th>
-                <th className="px-6 py-4">Shop Name</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {customers.length === 0 ? (
-                <tr><td colSpan={3} className="px-6 py-12 text-center text-gray-400">No customers found.</td></tr>
-              ) : (
-                customers.map(cust => {
-                  const shop = shops.find(s => s.id === cust.shopId);
-                  return (
-                    <tr key={cust.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4">
-                        <p className="font-bold text-gray-900">{cust.name}</p>
-                        <p className="text-sm text-gray-500">{cust.mobile}</p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-sm font-semibold text-blue-600">{shop?.shopName || 'No Shop Assigned'}</span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <button onClick={() => { setTransferModal({ isOpen: true, customer: cust }); setTargetShopId(cust.shopId || ''); }} className="text-xs font-bold bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg border border-blue-100">Transfer Shop</button>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-        <h3 className="text-lg font-bold text-gray-800 mb-6 flex justify-between items-center">Revenue Growth <span className="text-xs font-normal text-gray-400">Past 7 days</span></h3>
-        <div className="h-[250px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData}>
-              <defs><linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/></linearGradient></defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#64748b'}} />
-              <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#64748b'}} />
-              <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-              <Area type="monotone" dataKey="revenue" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-50 flex justify-between items-center">
           <h3 className="text-lg font-bold text-gray-800">Shops Management</h3>
         </div>
@@ -254,7 +213,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         onChange={(e) => updateCommission(shop.id, parseFloat(e.target.value))}
                         className="bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-sm font-semibold outline-none border border-blue-100"
                       >
-                        {[5, 6, 7, 8, 9, 10].map(v => (
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(v => (
                           <option key={v} value={v}>{v}%</option>
                         ))}
                       </select>
@@ -265,6 +224,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-3">
+                        <button onClick={() => setResetModal({ isOpen: true, userId: shop.ownerId, ownerName: owner?.name || 'Owner' })} className="text-xs font-bold text-amber-600 hover:underline">Reset Pass</button>
                         <button onClick={() => setRequestModal({ isOpen: true, shopId: shop.id })} className="text-xs font-bold text-blue-600 hover:underline">Request</button>
                         <button onClick={() => toggleApproval(shop.id)} className={`text-xs font-bold ${shop.isApproved ? 'text-red-600' : 'text-green-600'}`}>{shop.isApproved ? 'Block' : 'Approve'}</button>
                       </div>
@@ -277,6 +237,144 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       </section>
 
+      <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <h3 className="text-lg font-bold text-gray-800">Customer Management</h3>
+          <div className="relative w-full sm:w-64">
+            <input 
+              type="text" 
+              placeholder="Search customers..." 
+              value={customerSearch}
+              onChange={(e) => setCustomerSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <svg className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 text-gray-500 text-xs font-semibold uppercase tracking-wider">
+              <tr>
+                <th className="px-6 py-4">Customer Details</th>
+                <th className="px-6 py-4">Associated Shop</th>
+                <th className="px-6 py-4 text-center">Referral Code</th>
+                <th className="px-6 py-4 text-right">Lifetime Earnings</th>
+                <th className="px-6 py-4 text-right">Withdrawn</th>
+                <th className="px-6 py-4 text-right">Current Balance</th>
+                <th className="px-6 py-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {filteredCustomers.length === 0 ? (
+                <tr><td colSpan={7} className="px-6 py-10 text-center text-gray-400">No customers found.</td></tr>
+              ) : (
+                filteredCustomers.map(customer => {
+                  const shop = shops.find(s => s.id === customer.shopId);
+                  const earnings = getCustomerEarnings(customer.id);
+                  const withdrawals = getCustomerWithdrawals(customer.id);
+                  const balance = earnings - withdrawals;
+                  return (
+                    <tr key={customer.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <p className="font-bold text-gray-900">{customer.name}</p>
+                        <p className="text-xs text-gray-500">{customer.mobile}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        {shop ? (
+                          <div>
+                            <p className="text-sm font-semibold text-blue-600">{shop.shopName}</p>
+                            <p className="text-[10px] text-gray-400">ID: {shop.id}</p>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-red-400 font-bold uppercase">No Shop Assigned</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="font-mono text-xs font-bold bg-gray-100 px-2 py-1 rounded">{customer.referralCode || 'N/A'}</span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <p className="font-bold text-gray-700">₹{earnings.toLocaleString()}</p>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <p className="font-bold text-orange-600">₹{withdrawals.toLocaleString()}</p>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <p className={`font-bold ${balance > 0 ? 'text-green-600' : 'text-gray-400'}`}>₹{balance.toLocaleString()}</p>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button 
+                          onClick={() => setTransferModal({ isOpen: true, customer })}
+                          className="text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 transition-colors"
+                        >
+                          Transfer Shop
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Transfer Shop Modal */}
+      {transferModal.isOpen && transferModal.customer && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl">
+            <h3 className="text-xl font-bold mb-2">Transfer Customer</h3>
+            <p className="text-sm text-gray-500 mb-6 font-medium">
+              Moving <span className="text-blue-600 font-bold">{transferModal.customer.name}</span> to a new referral network.
+            </p>
+            <form onSubmit={handleTransferCustomer} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5">Select Target Shop</label>
+                <select 
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                  value={targetShopId}
+                  onChange={(e) => setTargetShopId(e.target.value)}
+                >
+                  <option value="">Select a Shop</option>
+                  {shops.filter(s => s.id !== transferModal.customer?.shopId).map(s => (
+                    <option key={s.id} value={s.id}>{s.shopName}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="submit" className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-blue-100">Confirm Transfer</button>
+                <button type="button" onClick={() => { setTransferModal({ isOpen: false, customer: null }); setTargetShopId(''); }} className="flex-1 bg-gray-100 text-gray-600 py-3 rounded-xl font-bold">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Password Reset Modal */}
+      {resetModal.isOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl p-6">
+            <h3 className="text-xl font-bold mb-1">Reset Shop Owner Password</h3>
+            <p className="text-sm text-gray-500 mb-4">Owner: <span className="font-bold text-gray-700">{resetModal.ownerName}</span></p>
+            <form onSubmit={handleResetPassword} className="space-y-4">
+              <input 
+                type="password"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" 
+                placeholder="New Password" 
+                required 
+                value={newPassword} 
+                onChange={e => setNewPassword(e.target.value)} 
+              />
+              <div className="flex gap-3">
+                <button type="submit" className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold">Save New Password</button>
+                <button type="button" onClick={() => { setResetModal({ isOpen: false, userId: '', ownerName: '' }); setNewPassword(''); }} className="flex-1 bg-gray-100 text-gray-600 py-3 rounded-xl font-bold">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Registration Docs Modal */}
       {docModal.isOpen && docModal.shop && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[100] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden p-8">
@@ -304,6 +402,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
+      {/* Industry Request Modal */}
       {requestModal.isOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-2xl p-6">

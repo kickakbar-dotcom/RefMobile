@@ -19,16 +19,24 @@ const App: React.FC = () => {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [complaints, setComplaints] = useState<Complaint[]>([]);
 
-  // Simulation of persistence (optional for demo)
+  // Simulation of persistence
   useEffect(() => {
     const saved = localStorage.getItem('refmobile_user');
-    if (saved) setCurrentUser(JSON.parse(saved));
-  }, []);
+    if (saved) {
+      const parsedUser = JSON.parse(saved);
+      // Ensure we have the latest user data from the state
+      const latestUser = users.find(u => u.id === parsedUser.id);
+      if (latestUser) setCurrentUser(latestUser);
+    }
+  }, [users]);
 
   const handleLogin = (identifier: string, role: UserRole, password?: string) => {
     const user = users.find(u => {
       if (role === UserRole.ADMIN) {
         return u.email === identifier && u.role === role && u.password === password;
+      }
+      if (role === UserRole.SHOP_OWNER) {
+        return u.mobile === identifier && u.role === role && u.password === password;
       }
       return u.mobile === identifier && u.role === role;
     });
@@ -37,7 +45,9 @@ const App: React.FC = () => {
       setCurrentUser(user);
       localStorage.setItem('refmobile_user', JSON.stringify(user));
     } else {
-      alert(role === UserRole.ADMIN ? 'Invalid Admin Code or password' : 'Invalid mobile number or role');
+      let msg = 'Invalid credentials';
+      if (role === UserRole.CUSTOMER) msg = 'Invalid mobile number';
+      alert(msg);
     }
   };
 
@@ -46,7 +56,7 @@ const App: React.FC = () => {
     localStorage.removeItem('refmobile_user');
   };
 
-  const registerShop = (shopData: Partial<Shop> & { ownerName: string, mobile: string, gstCertificatePhoto: string, shopPhoto: string, ownerSelfiePhoto: string }) => {
+  const registerShop = (shopData: Partial<Shop> & { ownerName: string, mobile: string, password?: string, gstCertificatePhoto: string, shopPhoto: string, ownerSelfiePhoto: string }) => {
     const newOwnerId = `owner-${Date.now()}`;
     const newShopId = `shop-${Date.now()}`;
     
@@ -55,6 +65,7 @@ const App: React.FC = () => {
       name: shopData.ownerName,
       role: UserRole.SHOP_OWNER,
       mobile: shopData.mobile,
+      password: shopData.password,
       shopId: newShopId
     };
 
@@ -65,7 +76,7 @@ const App: React.FC = () => {
       address: shopData.address || '',
       gstNumber: shopData.gstNumber || '',
       isApproved: false,
-      adminCommissionRate: 0.01,
+      adminCommissionRate: 0.05, // Updated default to 5%
       gstCertificatePhoto: shopData.gstCertificatePhoto,
       shopPhoto: shopData.shopPhoto,
       ownerSelfiePhoto: shopData.ownerSelfiePhoto
@@ -74,6 +85,10 @@ const App: React.FC = () => {
     setUsers(prev => [...prev, newOwner]);
     setShops(prev => [...prev, newShop]);
     alert('Shop registered successfully. Please wait for Admin approval.');
+  };
+
+  const resetUserPassword = (userId: string, newPassword: string) => {
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, password: newPassword } : u));
   };
 
   const renderDashboard = () => {
@@ -94,6 +109,7 @@ const App: React.FC = () => {
             setComplaints={setComplaints}
             users={users}
             setUsers={setUsers}
+            onResetPassword={resetUserPassword}
           />
         );
       case UserRole.SHOP_OWNER:
@@ -113,6 +129,7 @@ const App: React.FC = () => {
         return (
           <ShopDashboard 
             shop={myShop} 
+            setShops={setShops}
             products={products.filter(p => p.shopId === myShop.id)}
             setProducts={setProducts}
             sales={sales.filter(s => s.shopId === myShop.id)}

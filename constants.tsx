@@ -19,7 +19,7 @@ export const MOCK_SHOPS: Shop[] = [
     address: '123 Main St, Tech City',
     gstNumber: '22AAAAA0000A1Z5',
     isApproved: true,
-    adminCommissionRate: 0.10 // 10% of the commission amount
+    adminCommissionRate: 0.05 // 5% of the commission amount as requested
   }
 ];
 
@@ -30,6 +30,7 @@ export const MOCK_USERS: User[] = [
     name: 'Rajesh Kumar',
     role: UserRole.SHOP_OWNER,
     mobile: '8888888888',
+    password: 'Shop@123',
     shopId: 'shop-1'
   },
   {

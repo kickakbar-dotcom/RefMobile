@@ -1,10 +1,10 @@
-
 import React, { useState } from 'react';
 import { Shop, Product, ReferralSale, PayoutRequest, TransactionStatus, User, UserRole, AdminRequest, Lead, LeadStatus } from '../types';
 import { BRANDS } from '../constants';
 
 interface ShopDashboardProps {
   shop: Shop;
+  setShops: React.Dispatch<React.SetStateAction<Shop[]>>;
   products: Product[];
   setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
   sales: ReferralSale[];
@@ -20,7 +20,7 @@ interface ShopDashboardProps {
 }
 
 const ShopDashboard: React.FC<ShopDashboardProps> = ({ 
-  shop, products, setProducts, sales, setSales, payouts, setPayouts, users, setUsers, adminRequests, setAdminRequests, leads, setLeads
+  shop, setShops, products, setProducts, sales, setSales, payouts, setPayouts, users, setUsers, adminRequests, setAdminRequests, leads, setLeads
 }) => {
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [showAddCustomer, setShowAddCustomer] = useState(false);
@@ -46,6 +46,19 @@ const ShopDashboard: React.FC<ShopDashboardProps> = ({
     }
   };
 
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result as string;
+        setShops(prev => prev.map(s => s.id === shop.id ? { ...s, logo: base64 } : s));
+        alert('Shop logo updated successfully!');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const paidAdminCommission = payouts
     .filter(p => p.type === 'SHOP_TO_ADMIN_PAYOUT' && p.status === TransactionStatus.PAID)
     .reduce((acc, p) => acc + p.amount, 0);
@@ -63,47 +76,6 @@ const ShopDashboard: React.FC<ShopDashboardProps> = ({
     return sales
       .filter(s => s.referrerId === customerId)
       .reduce((acc, s) => acc + s.customerCommissionEarned, 0);
-  };
-
-  const handleAddProduct = (e: React.FormEvent) => {
-    e.preventDefault();
-    const prod: Product = {
-      id: `prod-${Date.now()}`,
-      shopId: shop.id,
-      name: newProduct.name,
-      brand: newProduct.brand,
-      price: newProduct.price,
-      customerCommission: newProduct.commission,
-      frontImage: newProduct.frontImage,
-      backImage: newProduct.backImage,
-    };
-    setProducts(prev => [...prev, prod]);
-    setShowAddProduct(false);
-    setNewProduct({ name: '', brand: BRANDS[0], price: 0, commission: 0, frontImage: '', backImage: '' });
-  };
-
-  const handleEditProduct = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingProduct) return;
-    setProducts(prev => prev.map(p => p.id === editingProduct.id ? editingProduct : p));
-    setEditingProduct(null);
-    alert('Product updated successfully!');
-  };
-
-  const handleAddCustomer = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cust: User = {
-      id: `cust-${Date.now()}`,
-      name: newCust.name,
-      role: UserRole.CUSTOMER,
-      mobile: newCust.mobile,
-      shopId: shop.id,
-      referralCode: `REF-${newCust.name.substring(0,3).toUpperCase()}${Date.now().toString().slice(-4)}`
-    };
-    setUsers(allUsers => [...allUsers, cust]);
-    setShowAddCustomer(false);
-    setNewCust({ name: '', mobile: '' });
-    alert(`Customer ID created! Referral Code: ${cust.referralCode}`);
   };
 
   const calculateCommissionSplit = (product: Product) => {
@@ -208,16 +180,74 @@ const ShopDashboard: React.FC<ShopDashboardProps> = ({
     window.location.href = upiUrl;
   };
 
+  // Fix: Added handleAddProduct to manage adding new products
+  const handleAddProduct = (e: React.FormEvent) => {
+    e.preventDefault();
+    const product: Product = {
+      id: `prod-${Date.now()}`,
+      shopId: shop.id,
+      name: newProduct.name,
+      brand: newProduct.brand,
+      price: newProduct.price,
+      customerCommission: newProduct.commission,
+      frontImage: newProduct.frontImage,
+      backImage: newProduct.backImage
+    };
+    setProducts(prev => [...prev, product]);
+    setShowAddProduct(false);
+    setNewProduct({ name: '', brand: BRANDS[0], price: 0, commission: 0, frontImage: '', backImage: '' });
+  };
+
+  // Fix: Added handleEditProduct to update existing products
+  const handleEditProduct = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+    setProducts(prev => prev.map(p => p.id === editingProduct.id ? editingProduct : p));
+    setEditingProduct(null);
+  };
+
+  // Fix: Added handleAddCustomer to register new customers within the shop
+  const handleAddCustomer = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newUser: User = {
+      id: `cust-${Date.now()}`,
+      name: newCust.name,
+      role: UserRole.CUSTOMER,
+      mobile: newCust.mobile,
+      shopId: shop.id,
+      referralCode: `REF-${newCust.name.substring(0, 3).toUpperCase()}${Date.now().toString().slice(-4)}`
+    };
+    setUsers(prev => [...prev, newUser]);
+    setShowAddCustomer(false);
+    setNewCust({ name: '', mobile: '' });
+    alert(`Customer registered successfully! Referral Code: ${newUser.referralCode}`);
+  };
+
   return (
     <div className="space-y-6 pb-12">
-      <header className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{shop.shopName}</h1>
-          <p className="text-gray-500">Shop Dashboard • GST: {shop.gstNumber}</p>
+      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+        <div className="flex items-center gap-4">
+          <div className="relative group">
+            <div className="w-16 h-16 bg-blue-50 rounded-2xl border-2 border-blue-100 flex items-center justify-center overflow-hidden">
+              {shop.logo ? (
+                <img src={shop.logo} className="w-full h-full object-cover" alt="Logo" />
+              ) : (
+                <svg className="w-8 h-8 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+              )}
+            </div>
+            <label className="absolute inset-0 bg-black/40 text-white text-[8px] font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer rounded-2xl transition-opacity">
+              CHANGE LOGO
+              <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+            </label>
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-gray-900 leading-none">{shop.shopName}</h1>
+            <p className="text-gray-500 text-sm mt-1">Shop Dashboard • GST: {shop.gstNumber}</p>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => setShowAddCustomer(true)} className="bg-white text-blue-600 border border-blue-200 px-4 py-2 rounded-xl text-sm font-bold shadow-sm">+ Create Customer ID</button>
-          <button onClick={() => setShowAddProduct(true)} className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-blue-200">+ List Product</button>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => setShowAddCustomer(true)} className="bg-white text-blue-600 border border-blue-200 px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-50">+ Add Customer</button>
+          <button onClick={() => setShowAddProduct(true)} className="bg-blue-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-blue-100 hover:bg-blue-700">+ List Product</button>
         </div>
       </header>
 
@@ -329,7 +359,8 @@ const ShopDashboard: React.FC<ShopDashboardProps> = ({
             {products.length === 0 ? <div className="p-8 text-center text-gray-400">No products listed.</div> : products.map(p => (
               <div key={p.id} className="p-4 flex gap-4 hover:bg-gray-50 group">
                 <div className="flex-shrink-0 flex gap-1">
-                  {p.frontImage ? <img src={p.frontImage} className="w-12 h-16 object-cover rounded-md border" /> : <div className="w-12 h-16 bg-gray-100 rounded-md border flex items-center justify-center text-[8px] text-gray-400">No Image</div>}
+                  {p.frontImage ? <img src={p.frontImage} className="w-12 h-16 object-cover rounded-md border" /> : <div className="w-12 h-16 bg-gray-100 rounded-md border flex items-center justify-center text-[8px] text-gray-400">No Front</div>}
+                  {p.backImage ? <img src={p.backImage} className="w-12 h-16 object-cover rounded-md border" /> : <div className="w-12 h-16 bg-gray-100 rounded-md border flex items-center justify-center text-[8px] text-gray-400">No Back</div>}
                 </div>
                 <div className="flex-grow">
                   <p className="font-bold text-gray-900">{p.name}</p>
@@ -364,7 +395,7 @@ const ShopDashboard: React.FC<ShopDashboardProps> = ({
                 <div className="flex gap-2 mb-3">
                   <div className="flex-grow bg-white border px-3 py-2 rounded-lg flex items-center justify-between overflow-hidden">
                     <span className="text-xs font-mono font-bold text-blue-600 truncate">{req.upiId}</span>
-                    <button onClick={() => copyToClipboard(req.upiId)} className="p-1 hover:text-blue-600"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V7m0 0h-4.586a1 1 0 01-1-1V2.586" /></svg></button>
+                    <button onClick={() => copyToClipboard(req.upiId)} className="p-1 hover:text-blue-600"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V7m0 0h-4.586a1 1 0 01-1-1V2.586" /></svg></button>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -389,9 +420,10 @@ const ShopDashboard: React.FC<ShopDashboardProps> = ({
         </div>
       </section>
 
+      {/* Add Product Modal */}
       {showAddProduct && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-2xl p-6">
+          <div className="bg-white w-full max-w-lg rounded-2xl p-6 max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold mb-4">Add Product</h3>
             <form onSubmit={handleAddProduct} className="space-y-4">
               <input placeholder="Name" className="w-full px-4 py-3 bg-gray-50 border rounded-xl" required value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} />
@@ -399,14 +431,65 @@ const ShopDashboard: React.FC<ShopDashboardProps> = ({
                 <input type="number" placeholder="Price" className="px-4 py-3 bg-gray-50 border rounded-xl" required value={newProduct.price || ''} onChange={e => setNewProduct({...newProduct, price: parseFloat(e.target.value)})} />
                 <input type="number" placeholder="Total Commission Pool" className="px-4 py-3 bg-gray-50 border rounded-xl" required value={newProduct.commission || ''} onChange={e => setNewProduct({...newProduct, commission: parseFloat(e.target.value)})} />
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase">Front Photo</label>
+                  <div className="relative border-2 border-dashed border-gray-200 rounded-xl h-24 flex items-center justify-center bg-gray-50 overflow-hidden">
+                    {newProduct.frontImage ? <img src={newProduct.frontImage} className="w-full h-full object-cover" /> : <span className="text-[10px] text-gray-400">Upload</span>}
+                    <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleImageUpload(e, 'frontImage')} />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase">Back Photo</label>
+                  <div className="relative border-2 border-dashed border-gray-200 rounded-xl h-24 flex items-center justify-center bg-gray-50 overflow-hidden">
+                    {newProduct.backImage ? <img src={newProduct.backImage} className="w-full h-full object-cover" /> : <span className="text-[10px] text-gray-400">Upload</span>}
+                    <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleImageUpload(e, 'backImage')} />
+                  </div>
+                </div>
+              </div>
               <p className="text-[10px] text-gray-500">Note: Platform takes {Math.round(shop.adminCommissionRate * 100)}% of the commission pool.</p>
               <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">List Product</button>
-              <button onClick={() => setShowAddProduct(false)} className="w-full py-2 text-gray-400">Cancel</button>
+              <button type="button" onClick={() => setShowAddProduct(false)} className="w-full py-2 text-gray-400">Cancel</button>
             </form>
           </div>
         </div>
       )}
 
+      {/* Edit Product Modal */}
+      {editingProduct && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-lg rounded-2xl p-6 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold mb-4">Edit Product</h3>
+            <form onSubmit={handleEditProduct} className="space-y-4">
+              <input placeholder="Name" className="w-full px-4 py-3 bg-gray-50 border rounded-xl" required value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} />
+              <div className="grid grid-cols-2 gap-4">
+                <input type="number" placeholder="Price" className="px-4 py-3 bg-gray-50 border rounded-xl" required value={editingProduct.price || ''} onChange={e => setEditingProduct({...editingProduct, price: parseFloat(e.target.value)})} />
+                <input type="number" placeholder="Total Commission Pool" className="px-4 py-3 bg-gray-50 border rounded-xl" required value={editingProduct.customerCommission || ''} onChange={e => setEditingProduct({...editingProduct, customerCommission: parseFloat(e.target.value)})} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase">Front Photo</label>
+                  <div className="relative border-2 border-dashed border-gray-200 rounded-xl h-24 flex items-center justify-center bg-gray-50 overflow-hidden">
+                    {editingProduct.frontImage ? <img src={editingProduct.frontImage} className="w-full h-full object-cover" /> : <span className="text-[10px] text-gray-400">Upload</span>}
+                    <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleImageUpload(e, 'frontImage', true)} />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase">Back Photo</label>
+                  <div className="relative border-2 border-dashed border-gray-200 rounded-xl h-24 flex items-center justify-center bg-gray-50 overflow-hidden">
+                    {editingProduct.backImage ? <img src={editingProduct.backImage} className="w-full h-full object-cover" /> : <span className="text-[10px] text-gray-400">Upload</span>}
+                    <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleImageUpload(e, 'backImage', true)} />
+                  </div>
+                </div>
+              </div>
+              <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">Update Product</button>
+              <button type="button" onClick={() => setEditingProduct(null)} className="w-full py-2 text-gray-400">Cancel</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Customer Modal */}
       {showAddCustomer && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-2xl p-6">

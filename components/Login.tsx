@@ -18,6 +18,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onRegisterShop }) => {
     ownerName: '',
     shopName: '',
     mobile: '',
+    password: '',
     address: '',
     gstNumber: '',
     gstCertificatePhoto: '',
@@ -38,7 +39,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onRegisterShop }) => {
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin(identifier, role, role === UserRole.ADMIN ? password : undefined);
+    onLogin(identifier, role, (role === UserRole.ADMIN || role === UserRole.SHOP_OWNER) ? password : undefined);
   };
 
   const handleRegisterSubmit = (e: React.FormEvent) => {
@@ -104,7 +105,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onRegisterShop }) => {
               />
             </div>
 
-            {role === UserRole.ADMIN && (
+            {(role === UserRole.ADMIN || role === UserRole.SHOP_OWNER) && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
                 <input 
@@ -128,9 +129,9 @@ const Login: React.FC<LoginProps> = ({ onLogin, onRegisterShop }) => {
             <div className="mt-4 p-4 bg-gray-50 rounded-lg text-xs text-gray-500 border border-gray-100">
               <p className="font-bold mb-1 uppercase tracking-wider">Demo Access:</p>
               <ul className="space-y-1">
-                <li>Admin Code: kickakbar@gmail.com / Akbar@7576</li>
-                <li>Shop: 8888888888</li>
-                <li>Customer: 7777777777</li>
+                <li><span className="font-semibold">Admin:</span> kickakbar@gmail.com / Akbar@7576</li>
+                <li><span className="font-semibold">Shop:</span> 8888888888 / Shop@123</li>
+                <li><span className="font-semibold">Customer:</span> 7777777777 (No Password)</li>
               </ul>
             </div>
           </form>
@@ -154,6 +155,13 @@ const Login: React.FC<LoginProps> = ({ onLogin, onRegisterShop }) => {
               placeholder="Mobile Number"
               className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
               onChange={e => setRegData({...regData, mobile: e.target.value})}
+              required
+            />
+            <input 
+              type="password"
+              placeholder="Create Password"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+              onChange={e => setRegData({...regData, password: e.target.value})}
               required
             />
             <input 
