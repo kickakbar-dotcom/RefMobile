@@ -1,0 +1,167 @@
+
+import React, { useState } from 'react';
+import { UserRole } from '../types';
+
+interface LoginProps {
+  onLogin: (identifier: string, role: UserRole, password?: string) => void;
+  onRegisterShop: (data: any) => void;
+}
+
+const Login: React.FC<LoginProps> = ({ onLogin, onRegisterShop }) => {
+  const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
+  const [role, setRole] = useState<UserRole>(UserRole.CUSTOMER);
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
+  
+  // Register fields
+  const [regData, setRegData] = useState({
+    ownerName: '',
+    shopName: '',
+    mobile: '',
+    address: '',
+    gstNumber: ''
+  });
+
+  const handleLoginSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onLogin(identifier, role, role === UserRole.ADMIN ? password : undefined);
+  };
+
+  const handleRegisterSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onRegisterShop(regData);
+    setActiveTab('login');
+  };
+
+  return (
+    <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden mt-8">
+      <div className="flex border-b">
+        <button 
+          onClick={() => setActiveTab('login')}
+          className={`flex-1 py-4 font-semibold text-sm transition-colors ${activeTab === 'login' ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
+        >
+          Login
+        </button>
+        <button 
+          onClick={() => setActiveTab('register')}
+          className={`flex-1 py-4 font-semibold text-sm transition-colors ${activeTab === 'register' ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
+        >
+          Register Shop
+        </button>
+      </div>
+
+      <div className="p-8">
+        {activeTab === 'login' ? (
+          <form onSubmit={handleLoginSubmit} className="space-y-6">
+            <h2 className="text-2xl font-bold text-gray-800">Welcome Back</h2>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Select Role</label>
+              <select 
+                value={role}
+                onChange={(e) => {
+                  setRole(e.target.value as UserRole);
+                  setIdentifier('');
+                  setPassword('');
+                }}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+              >
+                <option value={UserRole.CUSTOMER}>Customer</option>
+                <option value={UserRole.SHOP_OWNER}>Shop Owner</option>
+                <option value={UserRole.ADMIN}>Master Admin</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {role === UserRole.ADMIN ? 'Email Address' : 'Mobile Number'}
+              </label>
+              <input 
+                type={role === UserRole.ADMIN ? 'email' : 'tel'}
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder={role === UserRole.ADMIN ? 'kickakbar@gmail.com' : 'Enter 10-digit number'}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+                required
+              />
+            </div>
+
+            {role === UserRole.ADMIN && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input 
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter Password"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+                  required
+                />
+              </div>
+            )}
+
+            <button 
+              type="submit"
+              className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 active:scale-[0.98] transition-all shadow-lg shadow-blue-200"
+            >
+              Sign In
+            </button>
+
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg text-xs text-gray-500 border border-gray-100">
+              <p className="font-bold mb-1 uppercase tracking-wider">Demo Access:</p>
+              <ul className="space-y-1">
+                <li>Admin: kickakbar@gmail.com / Akbar@7576</li>
+                <li>Shop: 8888888888</li>
+                <li>Customer: 7777777777</li>
+              </ul>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={handleRegisterSubmit} className="space-y-4">
+            <h2 className="text-2xl font-bold text-gray-800">Shop Registration</h2>
+            
+            <input 
+              placeholder="Owner Full Name"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+              onChange={e => setRegData({...regData, ownerName: e.target.value})}
+              required
+            />
+            <input 
+              placeholder="Shop Name"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+              onChange={e => setRegData({...regData, shopName: e.target.value})}
+              required
+            />
+            <input 
+              placeholder="Mobile Number"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+              onChange={e => setRegData({...regData, mobile: e.target.value})}
+              required
+            />
+            <input 
+              placeholder="Address"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+              onChange={e => setRegData({...regData, address: e.target.value})}
+              required
+            />
+            <input 
+              placeholder="GST Number"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+              onChange={e => setRegData({...regData, gstNumber: e.target.value})}
+              required
+            />
+
+            <button 
+              type="submit"
+              className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 active:scale-[0.98] transition-all shadow-lg shadow-blue-200"
+            >
+              Submit Application
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default Login;

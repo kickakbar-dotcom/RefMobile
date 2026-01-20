@@ -1,0 +1,7 @@
+{
+  "name": "RefMobile - Referral & Commission Platform",
+  "description": "A three-tier referral and commission management system for mobile shops, featuring UPI-based payments, screenshot verification, and role-based dashboards.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
