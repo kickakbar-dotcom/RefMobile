@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, UserRole, Shop, Product, ReferralSale, PayoutRequest, TransactionStatus } from './types';
+import { User, UserRole, Shop, Product, ReferralSale, PayoutRequest, TransactionStatus, AdminRequest } from './types';
 import { MOCK_USERS, MOCK_SHOPS, INITIAL_ADMIN } from './constants';
 import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
@@ -15,6 +15,7 @@ const App: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [sales, setSales] = useState<ReferralSale[]>([]);
   const [payouts, setPayouts] = useState<PayoutRequest[]>([]);
+  const [adminRequests, setAdminRequests] = useState<AdminRequest[]>([]);
 
   // Simulation of persistence (optional for demo)
   useEffect(() => {
@@ -82,6 +83,8 @@ const App: React.FC = () => {
             sales={sales} 
             payouts={payouts} 
             setPayouts={setPayouts}
+            adminRequests={adminRequests}
+            setAdminRequests={setAdminRequests}
           />
         );
       case UserRole.SHOP_OWNER:
@@ -109,6 +112,8 @@ const App: React.FC = () => {
             setPayouts={setPayouts}
             users={users.filter(u => u.shopId === myShop.id && u.role === UserRole.CUSTOMER)}
             setUsers={setUsers}
+            adminRequests={adminRequests.filter(r => r.shopId === myShop.id)}
+            setAdminRequests={setAdminRequests}
           />
         );
       case UserRole.CUSTOMER:

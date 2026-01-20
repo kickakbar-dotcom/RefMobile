@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { Shop, ReferralSale, PayoutRequest, TransactionStatus } from '../types';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { Shop, ReferralSale, PayoutRequest, TransactionStatus, AdminRequest } from '../types';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
 interface AdminDashboardProps {
   shops: Shop[];
@@ -9,10 +9,15 @@ interface AdminDashboardProps {
   sales: ReferralSale[];
   payouts: PayoutRequest[];
   setPayouts: React.Dispatch<React.SetStateAction<PayoutRequest[]>>;
+  adminRequests: AdminRequest[];
+  setAdminRequests: React.Dispatch<React.SetStateAction<AdminRequest[]>>;
 }
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ shops, setShops, sales, payouts, setPayouts }) => {
-  const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
+  shops, setShops, sales, payouts, setPayouts, adminRequests, setAdminRequests 
+}) => {
+  const [requestModal, setRequestModal] = useState<{ isOpen: boolean; shopId: string }>({ isOpen: false, shopId: '' });
+  const [newReq, setNewReq] = useState({ title: '', message: '' });
 
   const stats = {
     totalShops: shops.length,
@@ -32,6 +37,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ shops, setShops, sales,
 
   const handlePayoutStatus = (id: string, status: TransactionStatus) => {
     setPayouts(prev => prev.map(p => p.id === id ? { ...p, status } : p));
+  };
+
+  const handleSendRequest = (e: React.FormEvent) => {
+    e.preventDefault();
+    const req: AdminRequest = {
+      id: `req-${Date.now()}`,
+      shopId: requestModal.shopId,
+      title: newReq.title,
+      message: newReq.message,
+      status: 'UNREAD',
+      timestamp: Date.now()
+    };
+    setAdminRequests(prev => [...prev, req]);
+    setRequestModal({ isOpen: false, shopId: '' });
+    setNewReq({ title: '', message: '' });
+    alert('Industry request sent to shop owner.');
   };
 
   // Mock data for chart
@@ -132,12 +153,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ shops, setShops, sales,
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button 
-                      onClick={() => toggleApproval(shop.id)}
-                      className={`text-sm font-semibold ${shop.isApproved ? 'text-red-600' : 'text-green-600'}`}
-                    >
-                      {shop.isApproved ? 'Block' : 'Approve'}
-                    </button>
+                    <div className="flex justify-end gap-3">
+                      <button 
+                        onClick={() => setRequestModal({ isOpen: true, shopId: shop.id })}
+                        className="text-xs font-bold text-blue-600 hover:underline"
+                      >
+                        Send Request
+                      </button>
+                      <button 
+                        onClick={() => toggleApproval(shop.id)}
+                        className={`text-xs font-bold ${shop.isApproved ? 'text-red-600' : 'text-green-600'}`}
+                      >
+                        {shop.isApproved ? 'Block' : 'Approve'}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -180,6 +209,47 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ shops, setShops, sales,
           )}
         </div>
       </section>
+
+      {/* Request Modal */}
+      {requestModal.isOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6">
+            <h3 className="text-xl font-bold mb-4">Send Industry Request</h3>
+            <form onSubmit={handleSendRequest} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                <input 
+                  className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g. Compliance Update, UPI Verification"
+                  required
+                  value={newReq.title}
+                  onChange={e => setNewReq({ ...newReq, title: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Message Detail</label>
+                <textarea 
+                  className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px]"
+                  placeholder="Describe your request to the shop owner..."
+                  required
+                  value={newReq.message}
+                  onChange={e => setNewReq({ ...newReq, message: e.target.value })}
+                />
+              </div>
+              <div className="flex gap-3">
+                <button type="submit" className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold">Send to Shop</button>
+                <button 
+                  type="button"
+                  onClick={() => setRequestModal({ isOpen: false, shopId: '' })}
+                  className="flex-1 bg-gray-100 text-gray-600 py-3 rounded-xl font-bold"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

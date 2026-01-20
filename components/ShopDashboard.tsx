@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Shop, Product, ReferralSale, PayoutRequest, TransactionStatus, User, UserRole } from '../types';
+import { Shop, Product, ReferralSale, PayoutRequest, TransactionStatus, User, UserRole, AdminRequest } from '../types';
 import { BRANDS } from '../constants';
 
 interface ShopDashboardProps {
@@ -13,22 +13,24 @@ interface ShopDashboardProps {
   setPayouts: React.Dispatch<React.SetStateAction<PayoutRequest[]>>;
   users: User[];
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
+  adminRequests: AdminRequest[];
+  setAdminRequests: React.Dispatch<React.SetStateAction<AdminRequest[]>>;
 }
 
 const ShopDashboard: React.FC<ShopDashboardProps> = ({ 
-  shop, products, setProducts, sales, setSales, payouts, setPayouts, users, setUsers 
+  shop, products, setProducts, sales, setSales, payouts, setPayouts, users, setUsers, adminRequests, setAdminRequests 
 }) => {
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [newProduct, setNewProduct] = useState({ name: '', brand: BRANDS[0], price: 0, commission: 0 });
   const [newCust, setNewCust] = useState({ name: '', mobile: '' });
-  const [uploadingFor, setUploadingFor] = useState<string | null>(null);
 
   const stats = {
     totalSales: sales.length,
     totalVolume: sales.reduce((acc, s) => acc + s.saleAmount, 0),
     totalCommissionOwed: sales.reduce((acc, s) => acc + s.customerCommissionEarned, 0),
     totalAdminCommissionOwed: sales.reduce((acc, s) => acc + s.adminCommissionEarned, 0),
+    unreadRequests: adminRequests.filter(r => r.status === 'UNREAD').length
   };
 
   const handleAddProduct = (e: React.FormEvent) => {
@@ -89,7 +91,10 @@ const ShopDashboard: React.FC<ShopDashboardProps> = ({
       status: TransactionStatus.PAID,
       screenshotUrl: 'https://picsum.photos/400/600' // Mock screenshot
     } : p));
-    setUploadingFor(null);
+  };
+
+  const markRequestRead = (id: string) => {
+    setAdminRequests(prev => prev.map(r => r.id === id ? { ...r, status: 'READ' } : r));
   };
 
   const requestAdminPayout = () => {
@@ -132,6 +137,40 @@ const ShopDashboard: React.FC<ShopDashboardProps> = ({
           </button>
         </div>
       </header>
+
+      {/* Admin Requests Notification */}
+      {adminRequests.length > 0 && (
+        <section className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-amber-900 flex items-center gap-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+              Official Requests from Admin
+              {stats.unreadRequests > 0 && (
+                <span className="bg-amber-600 text-white text-[10px] px-2 py-0.5 rounded-full">{stats.unreadRequests} New</span>
+              )}
+            </h3>
+          </div>
+          <div className="space-y-3">
+            {adminRequests.map(req => (
+              <div key={req.id} className={`p-3 rounded-xl border ${req.status === 'UNREAD' ? 'bg-white border-amber-300' : 'bg-amber-100 border-amber-200'}`}>
+                <div className="flex justify-between items-start">
+                  <p className="font-bold text-gray-900">{req.title}</p>
+                  <span className="text-[10px] text-gray-500 uppercase">{new Date(req.timestamp).toLocaleDateString()}</span>
+                </div>
+                <p className="text-sm text-gray-700 mt-1">{req.message}</p>
+                {req.status === 'UNREAD' && (
+                  <button 
+                    onClick={() => markRequestRead(req.id)}
+                    className="mt-2 text-xs font-bold text-amber-700 hover:underline"
+                  >
+                    Acknowledge
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

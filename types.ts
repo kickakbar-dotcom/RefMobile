@@ -66,3 +66,12 @@ export interface PayoutRequest {
   timestamp: number;
   type: 'CUSTOMER_PAYOUT' | 'SHOP_TO_ADMIN_PAYOUT';
 }
+
+export interface AdminRequest {
+  id: string;
+  shopId: string;
+  title: string;
+  message: string;
+  status: 'UNREAD' | 'READ';
+  timestamp: number;
+}
