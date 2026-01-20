@@ -29,7 +29,6 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
   const [inviteData, setInviteData] = useState({ name: '', mobile: '' });
   const [leadData, setLeadData] = useState({ name: '', mobile: '', productId: '' });
   const [complaintData, setComplaintData] = useState({ subject: 'Non-payment of Referral Commission', message: '' });
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   const totalEarned = sales.reduce((acc, s) => acc + s.customerCommissionEarned, 0);
   const totalWithdrawn = payouts
@@ -57,23 +56,6 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
     alert('Withdrawal request sent to shop owner!');
   };
 
-  const handleSubReferral = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newUser: User = {
-      id: `cust-${Date.now()}`,
-      name: inviteData.name,
-      role: UserRole.CUSTOMER,
-      mobile: inviteData.mobile,
-      shopId: currentUser.shopId,
-      referredBy: currentUser.id,
-      referralCode: `REF-${inviteData.name.substring(0,3).toUpperCase()}${Date.now().toString().slice(-4)}`
-    };
-    setUsers(all => [...all, newUser]);
-    setShowInviteModal(false);
-    setInviteData({ name: '', mobile: '' });
-    alert('Friend added to referral network! They can now log in using their mobile.');
-  };
-
   const handleLeadSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!leadData.productId) return alert('Please select a product');
@@ -91,6 +73,11 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
     setShowLeadModal(false);
     setLeadData({ name: '', mobile: '', productId: '' });
     alert('Lead sent to shop! Commission will be added to your wallet immediately after sale.');
+  };
+
+  const openQuickLead = (productId: string) => {
+    setLeadData(prev => ({ ...prev, productId }));
+    setShowLeadModal(true);
   };
 
   const handleComplaintSubmit = (e: React.FormEvent) => {
@@ -111,7 +98,7 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
   };
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-8 pb-24">
       <div className="relative overflow-hidden bg-white border border-blue-100 rounded-3xl p-5 shadow-sm flex items-center gap-4">
         <div className="absolute top-0 right-0 p-2"><span className="bg-blue-600 text-white text-[10px] font-black uppercase px-2 py-0.5 rounded-full shadow-sm tracking-tighter">Verified Shop</span></div>
         <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center flex-shrink-0 text-blue-600 shadow-inner overflow-hidden border border-blue-100">
@@ -141,7 +128,7 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
             <p className="text-lg font-bold">₹{totalEarned.toLocaleString()}</p>
           </div>
           <div className="bg-white/10 p-3 rounded-2xl border border-white/10">
-            <p className="text-[10px] text-blue-100 uppercase">Successful Referrals</p>
+            <p className="text-[10px] text-blue-100 uppercase">Referrals</p>
             <p className="text-lg font-bold">{sales.length}</p>
           </div>
         </div>
@@ -153,107 +140,124 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
         )}
       </header>
 
-      {/* Referral History Section - NEW */}
-      <section className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-5 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
-          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            Referral Earnings
-          </h3>
-          <span className="text-[10px] font-bold text-blue-600 uppercase">Immediate Credit</span>
-        </div>
-        <div className="max-h-[300px] overflow-y-auto divide-y divide-gray-50">
-          {sales.length === 0 ? <p className="text-center text-gray-400 py-10 text-sm">No earnings yet. Start referring!</p> : sales.slice().reverse().map(sale => {
-            const product = products.find(p => p.id === sale.productId);
-            return (
-              <div key={sale.id} className="p-4 flex justify-between items-center">
-                <div>
-                  <p className="font-bold text-gray-900">₹{sale.customerCommissionEarned.toLocaleString()}</p>
-                  <p className="text-[10px] text-blue-600 font-semibold uppercase">{product?.name || 'Mobile Purchase'}</p>
-                  <p className="text-[10px] text-gray-400">{new Date(sale.timestamp).toLocaleDateString()} • {sale.buyerName}</p>
-                </div>
-                <div className="bg-green-50 text-green-700 text-[10px] font-bold px-2 py-1 rounded-full border border-green-100 uppercase">Credited</div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Withdrawal History & Proofs */}
-      <section className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-5 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
-          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            Withdrawal Requests
-          </h3>
-        </div>
-        <div className="max-h-[300px] overflow-y-auto divide-y divide-gray-50">
-          {payouts.length === 0 ? <p className="text-center text-gray-400 py-10 text-sm">No withdrawals found.</p> : payouts.slice().reverse().map(payout => (
-            <div key={payout.id} className="p-4 flex justify-between items-center">
-              <div>
-                <p className="font-bold text-gray-900">₹{payout.amount.toLocaleString()}</p>
-                <p className="text-[10px] text-gray-500 uppercase">{payout.upiId}</p>
-                <p className="text-[10px] text-gray-400">{new Date(payout.timestamp).toLocaleDateString()}</p>
-              </div>
-              <div className="text-right">
-                <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${payout.status === TransactionStatus.PAID ? 'bg-green-100 text-green-700' : payout.status === TransactionStatus.PENDING ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>{payout.status}</span>
-                {payout.status === TransactionStatus.PAID && <button onClick={() => setViewProof(payout)} className="block mt-2 text-[10px] font-bold text-blue-600 hover:underline uppercase tracking-tighter">View Proof</button>}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Proof Modal */}
-      {viewProof && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[150] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-6 space-y-4">
-            <h3 className="text-xl font-bold text-gray-900">Payment Confirmation</h3>
-            <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
-              <p className="text-[10px] text-blue-400 font-bold uppercase">Transaction Reference ID</p>
-              <p className="text-lg font-black text-blue-900 font-mono break-all">{viewProof.transactionId || 'PROCESSED'}</p>
-              <div className="mt-3 flex justify-between border-t border-blue-100 pt-3">
-                 <p className="text-sm text-gray-500">Paid Amount</p>
-                 <p className="text-xl font-bold text-gray-900">₹{viewProof.amount.toLocaleString()}</p>
-              </div>
-            </div>
-            <button onClick={() => setViewProof(null)} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-blue-200">Close</button>
+      {/* Product Catalog Section */}
+      <section className="space-y-4">
+        <div className="flex justify-between items-end px-2">
+          <div>
+            <h3 className="text-xl font-black text-gray-900 leading-none">Shop Catalog</h3>
+            <p className="text-xs text-gray-400 mt-1 uppercase font-bold tracking-widest">Exclusive Deals</p>
           </div>
+          <button onClick={() => setShowLeadModal(true)} className="text-xs font-bold text-blue-600 underline">Refer Other</button>
         </div>
-      )}
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {products.length === 0 ? (
+            <p className="col-span-full text-center text-gray-400 py-10 bg-white rounded-3xl border border-dashed">No products listed by this shop yet.</p>
+          ) : (
+            products.map(product => (
+              <div key={product.id} className="bg-white rounded-3xl border border-gray-100 p-4 shadow-sm hover:shadow-md transition-shadow group">
+                <div className="aspect-[4/3] bg-gray-50 rounded-2xl mb-4 overflow-hidden relative border border-gray-50">
+                  {product.frontImage ? (
+                    <img src={product.frontImage} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-300">
+                      <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                    </div>
+                  )}
+                  <div className="absolute top-2 left-2">
+                    <span className="bg-green-600 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase">Ref Earn: ₹{product.customerCommission}</span>
+                  </div>
+                </div>
+                
+                <h4 className="font-black text-gray-900 text-lg leading-tight">{product.name}</h4>
+                <p className="text-xs text-gray-400 font-bold uppercase tracking-wide">{product.brand}</p>
+                
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="bg-blue-50/50 p-2 rounded-xl border border-blue-50">
+                    <p className="text-[8px] text-blue-500 font-bold uppercase">Cash Price</p>
+                    <p className="text-sm font-black text-blue-900">₹{product.price.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-indigo-50/50 p-2 rounded-xl border border-indigo-50">
+                    <p className="text-[8px] text-indigo-500 font-bold uppercase">EMI Plan</p>
+                    <p className="text-sm font-black text-indigo-900">₹{product.emiAmount?.toLocaleString()}/m</p>
+                  </div>
+                </div>
 
-      {/* Leads Management Section */}
-      <section className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-5 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
-          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-            My Leads
-          </h3>
-          <button onClick={() => setShowLeadModal(true)} className="text-xs font-bold bg-purple-600 text-white px-4 py-2 rounded-xl shadow-md">+ New Lead</button>
+                {product.emiMonths && (
+                   <div className="mt-2 flex justify-between items-center text-[10px] text-gray-500 px-1">
+                     <p>DP: <span className="font-bold text-gray-800">₹{product.downPayment?.toLocaleString()}</span></p>
+                     <p>Duration: <span className="font-bold text-gray-800">{product.emiMonths} Months</span></p>
+                   </div>
+                )}
+
+                <button 
+                  onClick={() => openQuickLead(product.id)}
+                  className="w-full mt-4 bg-gray-900 text-white py-3 rounded-2xl font-bold text-sm shadow-xl hover:bg-black transition-colors"
+                >
+                  I'm Interested / Refer
+                </button>
+              </div>
+            ))
+          )}
         </div>
-        <div className="p-4 space-y-3">
-          {leads.length === 0 ? <p className="text-center text-gray-400 py-6 text-sm">No leads submitted yet.</p> : leads.map(lead => {
-            const product = products.find(p => p.id === lead.productId);
-            return (
-              <div key={lead.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+      </section>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <section className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-5 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
+            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              Referral Earnings
+            </h3>
+          </div>
+          <div className="max-h-[300px] overflow-y-auto divide-y divide-gray-50">
+            {sales.length === 0 ? <p className="text-center text-gray-400 py-10 text-sm">No earnings yet.</p> : sales.slice().reverse().map(sale => (
+                <div key={sale.id} className="p-4 flex justify-between items-center">
+                  <div>
+                    <p className="font-bold text-gray-900">₹{sale.customerCommissionEarned.toLocaleString()}</p>
+                    <p className="text-[10px] text-gray-400">{new Date(sale.timestamp).toLocaleDateString()} • {sale.buyerName}</p>
+                  </div>
+                  <div className="bg-green-50 text-green-700 text-[10px] font-bold px-2 py-1 rounded-full border border-green-100 uppercase">Credited</div>
+                </div>
+              ))}
+          </div>
+        </section>
+
+        <section className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-5 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
+            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              Withdrawals
+            </h3>
+          </div>
+          <div className="max-h-[300px] overflow-y-auto divide-y divide-gray-50">
+            {payouts.length === 0 ? <p className="text-center text-gray-400 py-10 text-sm">No withdrawals found.</p> : payouts.slice().reverse().map(payout => (
+              <div key={payout.id} className="p-4 flex justify-between items-center">
                 <div>
-                  <p className="font-bold text-gray-900">{lead.referralName}</p>
-                  <p className="text-xs text-blue-600 font-semibold">{product?.name || 'Mobile Purchase'}</p>
+                  <p className="font-bold text-gray-900">₹{payout.amount.toLocaleString()}</p>
+                  <p className="text-[10px] text-gray-500 uppercase">{payout.upiId}</p>
                 </div>
                 <div className="text-right">
-                  <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${lead.status === LeadStatus.CONVERTED ? 'bg-green-100 text-green-700' : lead.status === LeadStatus.PENDING ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>{lead.status}</span>
+                  <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${payout.status === TransactionStatus.PAID ? 'bg-green-100 text-green-700' : payout.status === TransactionStatus.PENDING ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>{payout.status}</span>
+                  {payout.status === TransactionStatus.PAID && <button onClick={() => setViewProof(payout)} className="block mt-2 text-[10px] font-bold text-blue-600 hover:underline uppercase tracking-tighter">View Proof</button>}
                 </div>
               </div>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <section className="bg-white p-6 rounded-3xl shadow-sm border border-red-100">
+        <h3 className="text-lg font-bold text-gray-900 mb-2">Issue?</h3>
+        <p className="text-sm text-gray-500 mb-4">Report non-payment or other concerns.</p>
+        <button onClick={() => setShowComplaintModal(true)} className="bg-red-600 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-lg shadow-red-200">Report to Admin</button>
       </section>
 
-      {/* Add Lead Modal */}
+      {/* Modal Overlays */}
       {showLeadModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[120] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-[2rem] p-8 space-y-4">
-            <h3 className="text-2xl font-bold text-gray-900">Add New Lead</h3>
+            <h3 className="text-2xl font-bold text-gray-900">Refer a Buyer</h3>
             <form onSubmit={handleLeadSubmit} className="space-y-4">
               <input placeholder="Buyer Name" className="w-full px-5 py-4 bg-gray-50 border rounded-2xl outline-none" required value={leadData.name} onChange={e => setLeadData({...leadData, name: e.target.value})} />
               <input placeholder="Buyer Mobile" className="w-full px-5 py-4 bg-gray-50 border rounded-2xl outline-none" required value={leadData.mobile} onChange={e => setLeadData({...leadData, mobile: e.target.value})} />
@@ -261,21 +265,13 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                 <option value="">Select Product</option>
                 {products.map(p => <option key={p.id} value={p.id}>{p.brand} {p.name}</option>)}
               </select>
-              <button type="submit" className="w-full bg-purple-600 text-white py-4 rounded-2xl font-bold shadow-xl">Send Lead to Shop</button>
+              <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-xl">Submit Referral</button>
               <button type="button" onClick={() => setShowLeadModal(false)} className="w-full text-gray-400 py-2">Cancel</button>
             </form>
           </div>
         </div>
       )}
 
-      {/* Complaint Section */}
-      <section className="bg-white p-6 rounded-3xl shadow-sm border border-red-100">
-        <h3 className="text-lg font-bold text-gray-900 mb-2">Complaint Box</h3>
-        <p className="text-sm text-gray-500 mb-4">Commission not credited? Report it to Master Admin.</p>
-        <button onClick={() => setShowComplaintModal(true)} className="bg-red-600 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-lg shadow-red-200">Report Issue</button>
-      </section>
-
-      {/* Complaint Modal */}
       {showComplaintModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[130] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-[2rem] p-8 space-y-4">
@@ -286,6 +282,22 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
               <button type="submit" className="w-full bg-red-600 text-white py-4 rounded-2xl font-bold shadow-xl">Submit to Admin</button>
               <button type="button" onClick={() => setShowComplaintModal(false)} className="w-full text-gray-400 py-2">Cancel</button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {viewProof && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[150] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-6 space-y-4">
+            <h3 className="text-xl font-bold text-gray-900">Payment Proof</h3>
+            <div className="aspect-[3/4] bg-gray-100 rounded-3xl overflow-hidden border">
+               <img src={viewProof.screenshotUrl} className="w-full h-full object-cover" alt="Payment Proof" />
+            </div>
+            <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
+              <p className="text-[10px] text-blue-400 font-bold uppercase">Transaction ID</p>
+              <p className="text-lg font-black text-blue-900 font-mono break-all">{viewProof.transactionId || 'N/A'}</p>
+            </div>
+            <button onClick={() => setViewProof(null)} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-blue-200">Close</button>
           </div>
         </div>
       )}

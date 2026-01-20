@@ -56,6 +56,9 @@ export interface Product {
   brand: string;
   price: number;
   customerCommission: number; // Total commission set by shop owner
+  downPayment?: number;
+  emiAmount?: number;
+  emiMonths?: number;
   frontImage?: string; // Base64 string
   backImage?: string;  // Base64 string
 }
