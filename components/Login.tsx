@@ -72,7 +72,10 @@ const Login: React.FC<LoginProps> = ({ onLogin, onRegisterShop }) => {
       <div className="p-8">
         {activeTab === 'login' ? (
           <form onSubmit={handleLoginSubmit} className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-800">Welcome Back</h2>
+            <div className="text-center mb-4">
+              <h2 className="text-2xl font-bold text-gray-800">Welcome Back</h2>
+              <p className="text-xs text-gray-400 mt-1 uppercase font-black tracking-widest">Access your dashboard</p>
+            </div>
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Select Role</label>
@@ -126,18 +129,19 @@ const Login: React.FC<LoginProps> = ({ onLogin, onRegisterShop }) => {
               Sign In
             </button>
 
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg text-xs text-gray-500 border border-gray-100">
-              <p className="font-bold mb-1 uppercase tracking-wider">Demo Access:</p>
-              <ul className="space-y-1">
-                <li><span className="font-semibold">Admin:</span> kickakbar@gmail.com / Akbar@7576</li>
-                <li><span className="font-semibold">Shop:</span> 8888888888 / Shop@123</li>
-                <li><span className="font-semibold">Customer:</span> 7777777777 (No Password)</li>
-              </ul>
+            <div className="mt-6 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
+              <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2">About RefMobile</p>
+              <p className="text-xs text-blue-900 leading-relaxed font-medium">
+                RefMobile is an all-in-one referral ecosystem for mobile shops. We bridge the gap between retailers and referrers, providing transparent commission tracking, real-time lead management, and secure UPI-based payments.
+              </p>
             </div>
           </form>
         ) : (
           <form onSubmit={handleRegisterSubmit} className="space-y-4">
-            <h2 className="text-2xl font-bold text-gray-800">Shop Registration</h2>
+            <div className="text-center mb-4">
+              <h2 className="text-2xl font-bold text-gray-800">Shop Registration</h2>
+              <p className="text-xs text-gray-400 mt-1 uppercase font-black tracking-widest">Join our retail network</p>
+            </div>
             
             <input 
               placeholder="Owner Full Name"
