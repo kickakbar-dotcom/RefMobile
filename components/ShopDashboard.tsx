@@ -26,11 +26,11 @@ const ShopDashboard: React.FC<ShopDashboardProps> = ({
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [showCompleteSale, setShowCompleteSale] = useState(false);
-  const [showAdminPayout, setShowAdminPayout] = useState(false);
+  const [showPayoutProcessing, setShowPayoutProcessing] = useState<PayoutRequest | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [customerSearch, setCustomerSearch] = useState('');
   
-  const [payoutData, setPayoutData] = useState({ amount: 0, transactionId: '', screenshot: '' });
+  const [payoutData, setPayoutData] = useState({ transactionId: '', screenshot: '' });
   const [newProduct, setNewProduct] = useState({ 
     name: '', 
     brand: BRANDS[0], 
@@ -51,6 +51,23 @@ const ShopDashboard: React.FC<ShopDashboardProps> = ({
     .filter(p => p.type === 'SHOP_TO_ADMIN_PAYOUT' && p.status === TransactionStatus.PAID)
     .reduce((acc, p) => acc + p.amount, 0);
   const unpaidAdminIncome = totalAdminIncome - paidAdminIncome;
+
+  const pendingPayouts = payouts.filter(p => p.status === TransactionStatus.PENDING);
+
+  const handleUpdateLeadStatus = (leadId: string, status: LeadStatus) => {
+    setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status } : l));
+    if (status === LeadStatus.CONVERTED) {
+      const lead = leads.find(l => l.id === leadId);
+      if (lead) {
+        setSaleData({
+          customerId: lead.customerId,
+          productId: lead.productId,
+          buyerName: lead.referralName
+        });
+        setShowCompleteSale(true);
+      }
+    }
+  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'frontImage' | 'backImage', isEdit: boolean = false) => {
     const file = e.target.files?.[0];
@@ -89,11 +106,26 @@ const ShopDashboard: React.FC<ShopDashboardProps> = ({
     }
   };
 
-  const calculateCommissionSplit = (product: Product) => {
-    const totalComm = product.customerCommission;
-    const adminShare = totalComm * shop.adminCommissionRate;
-    const customerShare = totalComm - adminShare;
-    return { adminShare, customerShare };
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    alert('UPI ID Copied to clipboard!');
+  };
+
+  const handlePayoutComplete = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!showPayoutProcessing) return;
+    if (!payoutData.screenshot || !payoutData.transactionId) return alert('Proof required.');
+
+    setPayouts(prev => prev.map(p => p.id === showPayoutProcessing.id ? {
+      ...p,
+      status: TransactionStatus.PAID,
+      screenshotUrl: payoutData.screenshot,
+      transactionId: payoutData.transactionId
+    } : p));
+
+    setShowPayoutProcessing(null);
+    setPayoutData({ transactionId: '', screenshot: '' });
+    alert('Payout marked as COMPLETED. Money deducted from user wallet.');
   };
 
   const handleAddProduct = (e: React.FormEvent) => {
@@ -132,29 +164,6 @@ const ShopDashboard: React.FC<ShopDashboardProps> = ({
     setUsers(prev => [...prev, newUser]);
     setShowAddCustomer(false);
     setNewCust({ name: '', mobile: '', password: '' });
-    alert(`Customer added! Referral Code: ${referralCode}`);
-  };
-
-  const handleAdminPayoutSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (payoutData.amount <= 0 || !payoutData.screenshot) return alert('Please enter amount and upload proof.');
-    
-    const payout: PayoutRequest = {
-      id: `payout-${Date.now()}`,
-      userId: shop.ownerId,
-      shopId: shop.id,
-      amount: payoutData.amount,
-      upiId: 'ADMIN_MASTER_UPI',
-      status: TransactionStatus.PENDING,
-      screenshotUrl: payoutData.screenshot,
-      transactionId: payoutData.transactionId,
-      timestamp: Date.now(),
-      type: 'SHOP_TO_ADMIN_PAYOUT'
-    };
-    setPayouts(prev => [...prev, payout]);
-    setShowAdminPayout(false);
-    setPayoutData({ amount: 0, transactionId: '', screenshot: '' });
-    alert('Admin payout submitted for verification.');
   };
 
   const handleCompleteSale = (e: React.FormEvent) => {
@@ -162,7 +171,9 @@ const ShopDashboard: React.FC<ShopDashboardProps> = ({
     const product = products.find(p => p.id === saleData.productId);
     const customer = users.find(u => u.id === saleData.customerId);
     if (!product || !customer) return;
-    const { adminShare, customerShare } = calculateCommissionSplit(product);
+    const totalComm = product.customerCommission;
+    const adminShare = totalComm * shop.adminCommissionRate;
+    const customerShare = totalComm - adminShare;
     const sale: ReferralSale = {
       id: `sale-${Date.now()}`,
       shopId: shop.id,
@@ -187,35 +198,34 @@ const ShopDashboard: React.FC<ShopDashboardProps> = ({
     setEditingProduct(null);
   };
 
-  const getCustomerPerformance = (customerId: string) => {
-    const customerSales = sales.filter(s => s.referrerId === customerId);
-    const earnings = customerSales.reduce((acc, s) => acc + s.customerCommissionEarned, 0);
-    return { count: customerSales.length, earnings };
-  };
-
-  const filteredCustomers = users.filter(u => 
-    u.name.toLowerCase().includes(customerSearch.toLowerCase()) || 
-    u.mobile?.includes(customerSearch)
-  );
-
   return (
     <div className="space-y-6 pb-20">
-      {unpaidAdminIncome > 0 && (
-         <div className="bg-indigo-600 p-4 rounded-2xl text-white shadow-xl shadow-indigo-100 flex flex-col sm:flex-row justify-between items-center gap-4">
-           <div className="flex items-center gap-3">
-             <div className="bg-white/20 p-2 rounded-xl"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
-             <div>
-               <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Admin Unpaid Commission</p>
-               <h3 className="text-xl font-black">₹{unpaidAdminIncome.toFixed(2)}</h3>
-             </div>
-           </div>
-           <button 
-             onClick={() => { setPayoutData(prev => ({ ...prev, amount: unpaidAdminIncome })); setShowAdminPayout(true); }}
-             className="w-full sm:w-auto bg-white text-indigo-600 font-black px-6 py-3 rounded-xl shadow-lg active:scale-95 transition-transform"
-           >
-             Pay Admin via UPI
-           </button>
-         </div>
+      {pendingPayouts.length > 0 && (
+        <section className="bg-amber-50 border border-amber-200 rounded-2xl p-4 shadow-sm space-y-3">
+          <h3 className="text-sm font-black text-amber-800 uppercase tracking-widest flex items-center gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            Pending UPI Withdrawals ({pendingPayouts.length})
+          </h3>
+          <div className="space-y-2">
+            {pendingPayouts.map(p => {
+              const recipient = p.type === 'SHOP_TO_ADMIN_PAYOUT' ? 'Master Admin' : (users.find(u => u.id === p.userId)?.name || 'Customer');
+              return (
+                <div key={p.id} className="bg-white p-3 rounded-xl border border-amber-100 flex justify-between items-center shadow-sm">
+                  <div>
+                    <p className="text-xs font-black text-gray-900 leading-none">{recipient}</p>
+                    <p className="text-[10px] text-gray-500 font-bold mt-1">₹{p.amount.toLocaleString()} • {p.upiId}</p>
+                  </div>
+                  <button 
+                    onClick={() => setShowPayoutProcessing(p)}
+                    className="bg-amber-600 text-white text-[10px] font-black px-3 py-1.5 rounded-lg shadow-sm hover:bg-amber-700 uppercase"
+                  >
+                    Process Payout
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
@@ -224,7 +234,7 @@ const ShopDashboard: React.FC<ShopDashboardProps> = ({
             <div className="w-16 h-16 bg-blue-50 rounded-2xl border-2 border-blue-100 flex items-center justify-center overflow-hidden shadow-inner">
               {shop.logo ? <img src={shop.logo} className="w-full h-full object-cover" /> : <svg className="w-8 h-8 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>}
             </div>
-            <label className="absolute inset-0 bg-black/40 text-white text-[8px] font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer rounded-2xl transition-opacity">
+            <label className="absolute inset-0 bg-black/40 text-white text-[8px] font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer rounded-2xl transition-opacity font-black">
               LOGO<input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
             </label>
           </div>
@@ -236,9 +246,68 @@ const ShopDashboard: React.FC<ShopDashboardProps> = ({
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <button onClick={() => setShowAddCustomer(true)} className="flex-1 sm:flex-none bg-white text-blue-600 border border-blue-200 px-4 py-2.5 rounded-xl text-xs font-black shadow-sm">+ Customer</button>
           <button onClick={() => setShowAddProduct(true)} className="flex-1 sm:flex-none bg-white text-blue-600 border border-blue-200 px-4 py-2.5 rounded-xl text-xs font-black shadow-sm">+ Product</button>
-          <button onClick={() => setShowCompleteSale(true)} className="flex-1 sm:flex-none bg-green-600 text-white px-4 py-2.5 rounded-xl text-xs font-black shadow-lg shadow-green-100 hover:bg-green-700">✓ Record Sale</button>
+          <button onClick={() => setShowCompleteSale(true)} className="flex-1 sm:flex-none bg-green-600 text-white px-4 py-2.5 rounded-xl text-xs font-black shadow-lg shadow-green-100">✓ Record Sale</button>
         </div>
       </header>
+
+      {/* Leads / Referrals Section */}
+      <section className="bg-white rounded-2xl shadow-sm border border-indigo-100 overflow-hidden">
+        <div className="p-4 bg-indigo-50/50 border-b border-indigo-100 flex justify-between items-center">
+          <h3 className="text-sm font-black text-indigo-900 uppercase tracking-widest flex items-center gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+            Customer Referrals (Leads)
+          </h3>
+          <span className="text-[10px] bg-indigo-200 text-indigo-700 px-2 py-0.5 rounded-full font-black uppercase">{leads.length} Inbound</span>
+        </div>
+        <div className="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
+          {leads.length === 0 ? (
+            <div className="p-12 text-center text-gray-400 text-xs italic uppercase font-bold tracking-widest">No referrals yet</div>
+          ) : (
+            leads.slice().reverse().map(lead => {
+              const customer = users.find(u => u.id === lead.customerId);
+              const product = products.find(p => p.id === lead.productId);
+              return (
+                <div key={lead.id} className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex gap-4 items-start">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600 font-black text-sm uppercase">
+                      {lead.referralName.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-black text-gray-900 leading-tight">Buyer: {lead.referralName}</p>
+                      <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wide">Ref by: <span className="text-indigo-600">{customer?.name}</span> • Mob: {lead.referralMobile}</p>
+                      <p className="text-[10px] text-gray-400 mt-1 uppercase font-black">Model: {product?.name || 'Unknown'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    {lead.status === LeadStatus.PENDING ? (
+                      <>
+                        <button 
+                          onClick={() => handleUpdateLeadStatus(lead.id, LeadStatus.CONVERTED)}
+                          className="flex-1 sm:flex-none bg-green-600 text-white text-[10px] font-black px-4 py-2 rounded-lg uppercase shadow-sm hover:bg-green-700"
+                        >
+                          Mark Converted
+                        </button>
+                        <button 
+                          onClick={() => handleUpdateLeadStatus(lead.id, LeadStatus.REJECTED)}
+                          className="flex-1 sm:flex-none bg-white text-red-500 border border-red-100 text-[10px] font-black px-4 py-2 rounded-lg uppercase shadow-sm hover:bg-red-50"
+                        >
+                          Reject
+                        </button>
+                      </>
+                    ) : (
+                      <span className={`text-[10px] font-black uppercase px-3 py-1.5 rounded-full border ${
+                        lead.status === LeadStatus.CONVERTED ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-700 border-red-200'
+                      }`}>
+                        {lead.status}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
@@ -247,22 +316,22 @@ const ShopDashboard: React.FC<ShopDashboardProps> = ({
             <span className="text-[10px] bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full font-black uppercase">{products.length} Models</span>
           </div>
           <div className="max-h-[350px] overflow-y-auto divide-y divide-gray-50">
-            {products.length === 0 ? <div className="p-12 text-center text-gray-400 text-xs uppercase font-bold tracking-widest">No Inventory</div> : products.map(p => (
+            {products.length === 0 ? <div className="p-12 text-center text-gray-400 text-xs">No models listed.</div> : products.map(p => (
               <div key={p.id} className="p-4 flex gap-4 hover:bg-gray-50 group transition-colors">
                 <div className="flex-shrink-0">
-                  {p.frontImage ? <img src={p.frontImage} className="w-12 h-16 object-cover rounded-xl border border-gray-100" /> : <div className="w-12 h-16 bg-gray-50 rounded-xl border border-dashed flex items-center justify-center text-[8px] text-gray-300">N/A</div>}
+                  {p.frontImage ? <img src={p.frontImage} className="w-12 h-16 object-cover rounded-xl border border-gray-100" /> : <div className="w-12 h-16 bg-gray-50 rounded-xl border border-dashed flex items-center justify-center text-[8px] text-gray-300">No Image</div>}
                 </div>
                 <div className="flex-grow py-1">
-                  <p className="font-black text-gray-900 leading-none mb-1 uppercase tracking-tighter">{p.name}</p>
+                  <p className="font-black text-gray-900 uppercase tracking-tighter leading-none mb-1">{p.name}</p>
                   <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">{p.brand} • ₹{p.price.toLocaleString()}</p>
                   <div className="flex gap-1.5 mt-2">
                     <span className="text-[8px] font-black bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full border border-blue-100 uppercase tracking-tighter">EMI: ₹{p.emiAmount}/m</span>
-                    <span className="text-[8px] font-black bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full border border-orange-100 uppercase tracking-tighter">Ref: ₹{p.customerCommission}</span>
+                    <span className="text-[8px] font-black bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full border border-orange-100 uppercase tracking-tighter">Pool: ₹{p.customerCommission}</span>
                   </div>
                 </div>
-                <div className="flex flex-col justify-center gap-1 opacity-0 group-hover:opacity-100">
-                  <button onClick={() => setEditingProduct(p)} className="text-[10px] font-black text-blue-500 uppercase hover:underline">Edit</button>
-                  <button onClick={() => setProducts(prev => prev.filter(x => x.id !== p.id))} className="text-[10px] font-black text-red-400 uppercase hover:underline">Del</button>
+                <div className="flex flex-col justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button onClick={() => setEditingProduct(p)} className="text-[10px] font-black text-blue-500 uppercase">Edit</button>
+                  <button onClick={() => setProducts(prev => prev.filter(x => x.id !== p.id))} className="text-[10px] font-black text-red-400 uppercase">Del</button>
                 </div>
               </div>
             ))}
@@ -272,43 +341,33 @@ const ShopDashboard: React.FC<ShopDashboardProps> = ({
         <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
           <div className="p-4 bg-gray-50/50 border-b border-gray-100 space-y-3">
             <div className="flex justify-between items-center">
-              <h3 className="text-sm font-black text-gray-800 uppercase tracking-widest">Network</h3>
+              <h3 className="text-sm font-black text-gray-800 uppercase tracking-widest">Referral Network</h3>
               <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-black uppercase">{users.length} Active</span>
             </div>
-            <div className="relative">
-              <input 
-                type="text" 
-                placeholder="Find customer..." 
-                className="w-full pl-8 pr-4 py-2 bg-white border border-gray-100 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500"
-                value={customerSearch}
-                onChange={e => setCustomerSearch(e.target.value)}
-              />
-              <svg className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-            </div>
+            <input 
+              type="text" 
+              placeholder="Find member..." 
+              className="w-full px-4 py-2 bg-white border border-gray-100 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500 font-bold"
+              value={customerSearch}
+              onChange={e => setCustomerSearch(e.target.value)}
+            />
           </div>
           <div className="max-h-[350px] overflow-y-auto divide-y divide-gray-50">
-            {filteredCustomers.length === 0 ? <div className="p-12 text-center text-gray-400 text-xs">No Results</div> : filteredCustomers.map(user => {
-              const perf = getCustomerPerformance(user.id);
+            {users.filter(u => u.name.toLowerCase().includes(customerSearch.toLowerCase())).map(user => {
+              const salesCount = sales.filter(s => s.referrerId === user.id).length;
+              const earnings = sales.filter(s => s.referrerId === user.id).reduce((acc, s) => acc + s.customerCommissionEarned, 0);
               return (
-                <div key={user.id} className="p-4 flex justify-between items-center hover:bg-gray-50 transition-colors group">
+                <div key={user.id} className="p-4 flex justify-between items-center hover:bg-gray-50 transition-colors">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center font-black text-indigo-400 text-sm border border-indigo-100">{user.name.charAt(0)}</div>
+                    <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center font-black text-indigo-400 text-sm border border-indigo-100 uppercase">{user.name.charAt(0)}</div>
                     <div>
                       <p className="font-black text-gray-900 text-sm leading-none mb-1">{user.name}</p>
                       <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">{user.mobile} • <span className="text-blue-500">{user.referralCode}</span></p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <button 
-                      onClick={() => { setSaleData({ ...saleData, customerId: user.id }); setShowCompleteSale(true); }} 
-                      className="opacity-0 group-hover:opacity-100 bg-green-600 text-white px-2 py-1 rounded text-[10px] font-black uppercase tracking-tighter shadow-sm transition-all"
-                    >
-                      Record Sale
-                    </button>
-                    <div className="text-right">
-                      <p className="text-xs font-black text-green-600 leading-none">₹{perf.earnings.toLocaleString()}</p>
-                      <p className="text-[8px] text-gray-400 uppercase font-black tracking-widest mt-1">{perf.count} Sales</p>
-                    </div>
+                  <div className="text-right">
+                    <p className="text-xs font-black text-green-600 leading-none">₹{earnings.toLocaleString()}</p>
+                    <p className="text-[8px] text-gray-400 uppercase font-black tracking-widest mt-1">{salesCount} Sales</p>
                   </div>
                 </div>
               );
@@ -319,37 +378,31 @@ const ShopDashboard: React.FC<ShopDashboardProps> = ({
 
       <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-5 border-b border-gray-50 bg-gray-50/30">
-          <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Payout History</h3>
+          <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Transaction History</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-gray-50 text-[10px] font-black text-gray-500 uppercase tracking-widest">
               <tr>
                 <th className="px-6 py-4">Date</th>
-                <th className="px-6 py-4">Recipient</th>
-                <th className="px-6 py-4">Type</th>
+                <th className="px-6 py-4">Detail</th>
                 <th className="px-6 py-4 text-right">Amount</th>
                 <th className="px-6 py-4 text-center">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {payouts.length === 0 ? <tr><td colSpan={5} className="px-6 py-10 text-center text-gray-400 text-xs italic">No payouts found.</td></tr> : payouts.slice().reverse().map(payout => (
+              {payouts.slice().reverse().map(payout => (
                 <tr key={payout.id} className="hover:bg-gray-50/50">
                   <td className="px-6 py-4 text-[10px] text-gray-500 font-bold">{new Date(payout.timestamp).toLocaleDateString()}</td>
                   <td className="px-6 py-4">
-                    <p className="text-xs font-black text-gray-900 uppercase">{payout.type === 'SHOP_TO_ADMIN_PAYOUT' ? 'Master Admin' : (users.find(u => u.id === payout.userId)?.name || 'Customer')}</p>
-                    <p className="text-[10px] text-gray-400 font-mono">{payout.upiId}</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full border ${payout.type === 'SHOP_TO_ADMIN_PAYOUT' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-blue-50 text-blue-700 border-blue-100'}`}>
-                      {payout.type.split('_')[2]} Payout
-                    </span>
+                    <p className="text-xs font-black text-gray-900 uppercase">{payout.type === 'SHOP_TO_ADMIN_PAYOUT' ? 'Admin Commission' : 'Member Payout'}</p>
+                    <p className="text-[10px] text-gray-400 font-mono tracking-tighter">{payout.upiId}</p>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <p className="text-sm font-black text-gray-900">₹{payout.amount.toFixed(2)}</p>
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${payout.status === TransactionStatus.PAID ? 'bg-green-100 text-green-700' : payout.status === TransactionStatus.PENDING ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
+                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${payout.status === TransactionStatus.PAID ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
                       {payout.status}
                     </span>
                   </td>
@@ -360,55 +413,68 @@ const ShopDashboard: React.FC<ShopDashboardProps> = ({
         </div>
       </section>
 
-      {/* Admin Payout Modal */}
-      {showAdminPayout && (
+      {/* Payout Processing Modal */}
+      {showPayoutProcessing && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 space-y-6">
-            <h3 className="text-2xl font-black text-gray-900 tracking-tighter uppercase">Admin Comm. Payout</h3>
-            <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
-               <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Master Admin UPI</p>
-               <p className="text-lg font-black text-blue-900 font-mono">admin.master@upi</p>
-            </div>
-            <form onSubmit={handleAdminPayoutSubmit} className="space-y-4">
-              <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Amount to Transfer</label>
-                <input type="number" step="0.01" className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl font-black text-lg outline-none focus:ring-2 focus:ring-indigo-500" required value={payoutData.amount || ''} onChange={e => setPayoutData({...payoutData, amount: parseFloat(e.target.value)})} />
-              </div>
-              <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Ref ID / Transaction ID</label>
-                <input className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500" required value={payoutData.transactionId} onChange={e => setPayoutData({...payoutData, transactionId: e.target.value})} />
-              </div>
-              <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Payment Screenshot</label>
-                <div className="mt-1 relative border-2 border-dashed border-gray-200 rounded-2xl aspect-[3/2] flex items-center justify-center overflow-hidden bg-gray-50">
-                  {payoutData.screenshot ? <img src={payoutData.screenshot} className="w-full h-full object-cover" /> : <p className="text-xs text-gray-400 font-bold uppercase">Upload Proof</p>}
-                  <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" required onChange={handlePayoutScreenshot} />
+          <div className="bg-white w-full max-md rounded-[2.5rem] p-8 space-y-6 shadow-2xl">
+            <h3 className="text-2xl font-black text-gray-900 tracking-tighter uppercase">Execute Payout</h3>
+            
+            <div className="space-y-4">
+              <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 flex justify-between items-center">
+                <div>
+                  <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Recipient UPI ID</p>
+                  <p className="text-lg font-black text-blue-900 font-mono break-all">{showPayoutProcessing.upiId}</p>
                 </div>
+                <button 
+                  onClick={() => copyToClipboard(showPayoutProcessing.upiId)}
+                  className="bg-blue-600 text-white p-2 rounded-xl shadow-md hover:bg-blue-700"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
+                </button>
               </div>
-              <button type="submit" className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-sm shadow-xl shadow-indigo-100">Confirm Admin Payout</button>
-              <button type="button" onClick={() => setShowAdminPayout(false)} className="w-full text-gray-400 font-bold py-2">Close</button>
-            </form>
+
+              <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Payout Amount</p>
+                <p className="text-2xl font-black text-gray-900">₹{showPayoutProcessing.amount.toLocaleString()}</p>
+              </div>
+
+              <form onSubmit={handlePayoutComplete} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Payment Ref / Transaction ID</label>
+                  <input className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-bold" placeholder="Paste TXN ID here" required value={payoutData.transactionId} onChange={e => setPayoutData({...payoutData, transactionId: e.target.value})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Payment Screenshot Proof</label>
+                  <div className="relative border-2 border-dashed border-gray-200 rounded-2xl aspect-[16/9] flex items-center justify-center overflow-hidden bg-gray-50">
+                    {payoutData.screenshot ? <img src={payoutData.screenshot} className="w-full h-full object-cover" /> : <p className="text-xs text-gray-400 font-bold uppercase">Upload Receipt</p>}
+                    <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" required onChange={handlePayoutScreenshot} />
+                  </div>
+                </div>
+                <button type="submit" className="w-full bg-green-600 text-white py-4 rounded-2xl font-black text-sm shadow-xl shadow-green-100 uppercase tracking-widest">Confirm & Complete</button>
+                <button type="button" onClick={() => setShowPayoutProcessing(null)} className="w-full text-gray-400 font-bold py-2 uppercase text-xs tracking-widest">Cancel</button>
+              </form>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Other modals remain similar but with enhanced styling */}
+      {/* Record Sale Modal */}
       {showCompleteSale && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 space-y-5 shadow-2xl">
-            <h3 className="text-2xl font-black text-gray-900 tracking-tighter uppercase">Complete Sale</h3>
+            <h3 className="text-2xl font-black text-gray-900 tracking-tighter uppercase">Record A Sale</h3>
             <form onSubmit={handleCompleteSale} className="space-y-4">
-              <select className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold appearance-none outline-none focus:ring-2 focus:ring-green-500" required value={saleData.productId} onChange={e => setSaleData({...saleData, productId: e.target.value})}>
-                <option value="">Select Product</option>
+              <select className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold outline-none" required value={saleData.productId} onChange={e => setSaleData({...saleData, productId: e.target.value})}>
+                <option value="">Choose Model</option>
                 {products.map(p => <option key={p.id} value={p.id}>{p.brand} {p.name}</option>)}
               </select>
-              <select className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold appearance-none outline-none focus:ring-2 focus:ring-green-500" required value={saleData.customerId} onChange={e => setSaleData({...saleData, customerId: e.target.value})}>
-                <option value="">Select Referrer</option>
+              <select className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold outline-none" required value={saleData.customerId} onChange={e => setSaleData({...saleData, customerId: e.target.value})}>
+                <option value="">Referrer / Member</option>
                 {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.referralCode})</option>)}
               </select>
-              <input placeholder="Buyer Name" className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-green-500" required value={saleData.buyerName} onChange={e => setSaleData({...saleData, buyerName: e.target.value})} />
-              <button type="submit" className="w-full bg-green-600 text-white py-4 rounded-2xl font-black shadow-xl shadow-green-100">Confirm & Credit Commissions</button>
-              <button type="button" onClick={() => setShowCompleteSale(false)} className="w-full text-gray-400 font-bold py-2">Cancel</button>
+              <input placeholder="Customer/Buyer Full Name" className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold outline-none" required value={saleData.buyerName} onChange={e => setSaleData({...saleData, buyerName: e.target.value})} />
+              <button type="submit" className="w-full bg-green-600 text-white py-4 rounded-2xl font-black shadow-xl uppercase tracking-widest text-xs">Confirm Sale</button>
+              <button type="button" onClick={() => setShowCompleteSale(false)} className="w-full text-gray-400 font-bold py-2">Close</button>
             </form>
           </div>
         </div>
@@ -416,30 +482,51 @@ const ShopDashboard: React.FC<ShopDashboardProps> = ({
 
       {showAddProduct && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-2xl p-6 max-h-[90vh] overflow-y-auto shadow-2xl">
-            <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-4">List New Model</h3>
+          <div className="bg-white w-full max-w-lg rounded-3xl p-8 max-h-[90vh] overflow-y-auto shadow-2xl">
+            <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-6">List Model</h3>
             <form onSubmit={handleAddProduct} className="space-y-4">
-              <input placeholder="Model Name" className="w-full px-4 py-3 bg-gray-50 border rounded-xl font-bold" required value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} />
               <div className="grid grid-cols-2 gap-4">
-                <input type="number" placeholder="Cash Price" className="px-4 py-3 bg-gray-50 border rounded-xl font-bold" required value={newProduct.price || ''} onChange={e => setNewProduct({...newProduct, price: parseFloat(e.target.value)})} />
-                <input type="number" placeholder="Total Commission" className="px-4 py-3 bg-gray-50 border rounded-xl font-bold" required value={newProduct.commission || ''} onChange={e => setNewProduct({...newProduct, commission: parseFloat(e.target.value)})} />
-              </div>
-              <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 space-y-3">
-                <p className="text-[10px] font-black text-blue-800 uppercase tracking-widest">EMI Configuration</p>
-                <div className="grid grid-cols-3 gap-2">
-                  <input type="number" placeholder="DownPay" className="px-3 py-2 bg-white border rounded-lg text-xs font-bold" value={newProduct.downPayment || ''} onChange={e => setNewProduct({...newProduct, downPayment: parseFloat(e.target.value)})} />
-                  <input type="number" placeholder="Monthly" className="px-3 py-2 bg-white border rounded-lg text-xs font-bold" value={newProduct.emiAmount || ''} onChange={e => setNewProduct({...newProduct, emiAmount: parseFloat(e.target.value)})} />
-                  <input type="number" placeholder="Months" className="px-3 py-2 bg-white border rounded-lg text-xs font-bold" value={newProduct.emiMonths || ''} onChange={e => setNewProduct({...newProduct, emiMonths: parseInt(e.target.value)})} />
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Brand</label>
+                  <select 
+                    className="w-full px-4 py-3 bg-gray-50 border rounded-2xl font-bold outline-none" 
+                    value={newProduct.brand} 
+                    onChange={e => setNewProduct({...newProduct, brand: e.target.value})}
+                  >
+                    {BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Model Name</label>
+                  <input placeholder="e.g. iPhone 15" className="w-full px-4 py-3 bg-gray-50 border rounded-2xl font-bold outline-none" required value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="relative border-2 border-dashed border-gray-200 rounded-2xl h-32 flex items-center justify-center bg-gray-50 overflow-hidden">
-                  {newProduct.frontImage ? <img src={newProduct.frontImage} className="w-full h-full object-cover" /> : <p className="text-[10px] text-gray-400 font-bold uppercase">Front View</p>}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Full Cash Price</label>
+                  <input type="number" placeholder="₹" className="w-full px-4 py-3 bg-gray-50 border rounded-2xl font-bold outline-none" required value={newProduct.price || ''} onChange={e => setNewProduct({...newProduct, price: parseFloat(e.target.value)})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Commission Pool</label>
+                  <input type="number" placeholder="₹" className="w-full px-4 py-3 bg-gray-50 border rounded-2xl font-bold outline-none" required value={newProduct.commission || ''} onChange={e => setNewProduct({...newProduct, commission: parseFloat(e.target.value)})} />
+                </div>
+              </div>
+              <div className="p-5 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-3">
+                <p className="text-[10px] font-black text-blue-800 uppercase tracking-widest">EMI Setup</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <input type="number" placeholder="DownPay" className="px-3 py-3 bg-white border rounded-xl font-bold text-xs outline-none" value={newProduct.downPayment || ''} onChange={e => setNewProduct({...newProduct, downPayment: parseFloat(e.target.value)})} />
+                  <input type="number" placeholder="Monthly" className="px-3 py-3 bg-white border rounded-xl font-bold text-xs outline-none" value={newProduct.emiAmount || ''} onChange={e => setNewProduct({...newProduct, emiAmount: parseFloat(e.target.value)})} />
+                  <input type="number" placeholder="Months" className="px-3 py-3 bg-white border rounded-xl font-bold text-xs outline-none" value={newProduct.emiMonths || ''} onChange={e => setNewProduct({...newProduct, emiMonths: parseInt(e.target.value)})} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="relative border-2 border-dashed border-gray-200 rounded-2xl h-24 flex items-center justify-center bg-gray-50 overflow-hidden">
+                  {newProduct.frontImage ? <img src={newProduct.frontImage} className="w-full h-full object-cover" /> : <p className="text-[10px] text-gray-400 font-bold uppercase">Front Photo</p>}
                   <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleImageUpload(e, 'frontImage')} />
                 </div>
               </div>
-              <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black shadow-lg shadow-blue-100">Publish Model</button>
-              <button type="button" onClick={() => setShowAddProduct(false)} className="w-full py-2 text-gray-400 font-bold">Discard</button>
+              <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black shadow-lg uppercase tracking-widest text-xs">Publish Model</button>
+              <button type="button" onClick={() => setShowAddProduct(false)} className="w-full py-2 text-gray-400 font-bold uppercase text-[10px]">Cancel</button>
             </form>
           </div>
         </div>
@@ -447,13 +534,13 @@ const ShopDashboard: React.FC<ShopDashboardProps> = ({
 
       {showAddCustomer && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-[2rem] p-8 shadow-2xl">
-            <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight mb-4">Add To Network</h3>
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl">
+            <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight mb-6 text-center">Register To Network</h3>
             <form onSubmit={handleAddCustomer} className="space-y-4">
-              <input placeholder="Full Name" className="w-full px-5 py-4 bg-gray-50 border rounded-2xl font-bold" required value={newCust.name} onChange={e => setNewCust({...newCust, name: e.target.value})} />
-              <input type="tel" placeholder="Mobile" className="w-full px-5 py-4 bg-gray-50 border rounded-2xl font-bold" required value={newCust.mobile} onChange={e => setNewCust({...newCust, mobile: e.target.value})} />
-              <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black shadow-lg shadow-blue-100">Register Customer</button>
-              <button type="button" onClick={() => setShowAddCustomer(false)} className="w-full py-2 text-gray-400 font-bold">Cancel</button>
+              <input placeholder="Full Name" className="w-full px-5 py-4 bg-gray-50 border rounded-2xl font-bold outline-none" required value={newCust.name} onChange={e => setNewCust({...newCust, name: e.target.value})} />
+              <input type="tel" placeholder="10 Digit Mobile" className="w-full px-5 py-4 bg-gray-50 border rounded-2xl font-bold outline-none" required value={newCust.mobile} onChange={e => setNewCust({...newCust, mobile: e.target.value})} />
+              <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black shadow-lg uppercase tracking-widest text-xs">Add Member</button>
+              <button type="button" onClick={() => setShowAddCustomer(false)} className="w-full py-2 text-gray-400 font-bold uppercase text-[10px]">Back</button>
             </form>
           </div>
         </div>

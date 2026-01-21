@@ -170,7 +170,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col pb-20 md:pb-0">
       <Navigation user={currentUser} onLogout={handleLogout} />
-      <main className="flex-grow container mx-auto px-4 py-6 max-w-4xl">
+      <main className="flex-grow container mx-auto px-4 py-6 max-w-6xl">
         {renderDashboard()}
       </main>
     </div>

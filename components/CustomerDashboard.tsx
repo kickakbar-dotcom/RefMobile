@@ -21,12 +21,10 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
   currentUser, shop, products, sales, payouts, setPayouts, setUsers, users, leads, setLeads, complaints, setComplaints
 }) => {
   const [upiId, setUpiId] = useState('');
-  const [showInviteModal, setShowInviteModal] = useState(false);
   const [showLeadModal, setShowLeadModal] = useState(false);
   const [showComplaintModal, setShowComplaintModal] = useState(false);
   const [viewProof, setViewProof] = useState<PayoutRequest | null>(null);
   
-  const [inviteData, setInviteData] = useState({ name: '', mobile: '' });
   const [leadData, setLeadData] = useState({ name: '', mobile: '', productId: '' });
   const [complaintData, setComplaintData] = useState({ subject: 'Non-payment of Referral Commission', message: '' });
 
@@ -34,7 +32,12 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
   const totalWithdrawn = payouts
     .filter(p => p.status === TransactionStatus.PAID)
     .reduce((acc, p) => acc + p.amount, 0);
-  const currentBalance = totalEarned - totalWithdrawn;
+  const pendingWithdrawn = payouts
+    .filter(p => p.status === TransactionStatus.PENDING)
+    .reduce((acc, p) => acc + p.amount, 0);
+  
+  // Balance available to withdraw (not counting already pending requests)
+  const currentBalance = totalEarned - totalWithdrawn - pendingWithdrawn;
 
   const handleWithdrawalRequest = (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,7 +56,7 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
     };
     setPayouts(prev => [...prev, req]);
     setUpiId('');
-    alert('Withdrawal request sent to shop owner!');
+    alert('Withdrawal request sent to shop owner! It will be processed soon.');
   };
 
   const handleLeadSubmit = (e: React.FormEvent) => {
@@ -72,7 +75,7 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
     setLeads(prev => [...prev, newLead]);
     setShowLeadModal(false);
     setLeadData({ name: '', mobile: '', productId: '' });
-    alert('Lead sent to shop! Commission will be added to your wallet immediately after sale.');
+    alert('Lead sent to shop!');
   };
 
   const openQuickLead = (productId: string) => {
@@ -117,8 +120,9 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
       <header className="bg-gradient-to-br from-blue-600 to-indigo-700 p-6 rounded-3xl text-white shadow-xl">
         <div className="flex justify-between items-start mb-6">
           <div>
-            <p className="text-blue-100 text-[10px] font-bold uppercase tracking-widest">Available Wallet Balance</p>
+            <p className="text-blue-100 text-[10px] font-bold uppercase tracking-widest">Available Balance</p>
             <h2 className="text-4xl font-bold mt-1">₹{currentBalance.toLocaleString()}</h2>
+            {pendingWithdrawn > 0 && <p className="text-[10px] font-bold text-yellow-300 uppercase mt-1">₹{pendingWithdrawn.toLocaleString()} Pending</p>}
           </div>
           <div className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-semibold">ID: {currentUser.referralCode}</div>
         </div>
@@ -128,14 +132,14 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
             <p className="text-lg font-bold">₹{totalEarned.toLocaleString()}</p>
           </div>
           <div className="bg-white/10 p-3 rounded-2xl border border-white/10">
-            <p className="text-[10px] text-blue-100 uppercase">Referrals</p>
-            <p className="text-lg font-bold">{sales.length}</p>
+            <p className="text-[10px] text-blue-100 uppercase">Total Paid</p>
+            <p className="text-lg font-bold">₹{totalWithdrawn.toLocaleString()}</p>
           </div>
         </div>
         {currentBalance >= 100 && (
           <form onSubmit={handleWithdrawalRequest} className="mt-6 flex flex-col gap-2">
-            <input type="text" placeholder="Enter UPI ID" className="w-full px-4 py-3 bg-white/20 border border-white/20 rounded-xl text-white placeholder-blue-200 outline-none text-sm" required value={upiId} onChange={e => setUpiId(e.target.value)} />
-            <button type="submit" className="w-full bg-white text-blue-600 font-bold py-3 rounded-xl shadow-lg active:scale-95 transition-transform">Request Withdrawal</button>
+            <input type="text" placeholder="Enter Your UPI ID" className="w-full px-4 py-3 bg-white/20 border border-white/20 rounded-xl text-white placeholder-blue-200 outline-none text-sm" required value={upiId} onChange={e => setUpiId(e.target.value)} />
+            <button type="submit" className="w-full bg-white text-blue-600 font-bold py-3 rounded-xl shadow-lg active:scale-95 transition-transform">Withdraw to UPI</button>
           </form>
         )}
       </header>
@@ -147,12 +151,11 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
             <h3 className="text-xl font-black text-gray-900 leading-none">Shop Catalog</h3>
             <p className="text-xs text-gray-400 mt-1 uppercase font-bold tracking-widest">Exclusive Deals</p>
           </div>
-          <button onClick={() => setShowLeadModal(true)} className="text-xs font-bold text-blue-600 underline">Refer Other</button>
         </div>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {products.length === 0 ? (
-            <p className="col-span-full text-center text-gray-400 py-10 bg-white rounded-3xl border border-dashed">No products listed by this shop yet.</p>
+            <p className="col-span-full text-center text-gray-400 py-10 bg-white rounded-3xl border border-dashed">No products listed.</p>
           ) : (
             products.map(product => (
               <div key={product.id} className="bg-white rounded-3xl border border-gray-100 p-4 shadow-sm hover:shadow-md transition-shadow group">
@@ -183,18 +186,11 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                   </div>
                 </div>
 
-                {product.emiMonths && (
-                   <div className="mt-2 flex justify-between items-center text-[10px] text-gray-500 px-1">
-                     <p>DP: <span className="font-bold text-gray-800">₹{product.downPayment?.toLocaleString()}</span></p>
-                     <p>Duration: <span className="font-bold text-gray-800">{product.emiMonths} Months</span></p>
-                   </div>
-                )}
-
                 <button 
                   onClick={() => openQuickLead(product.id)}
                   className="w-full mt-4 bg-gray-900 text-white py-3 rounded-2xl font-bold text-sm shadow-xl hover:bg-black transition-colors"
                 >
-                  I'm Interested / Refer
+                  Refer A Buyer
                 </button>
               </div>
             ))
@@ -205,10 +201,7 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <section className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-5 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
-            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              Referral Earnings
-            </h3>
+            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">Referral Earnings</h3>
           </div>
           <div className="max-h-[300px] overflow-y-auto divide-y divide-gray-50">
             {sales.length === 0 ? <p className="text-center text-gray-400 py-10 text-sm">No earnings yet.</p> : sales.slice().reverse().map(sale => (
@@ -225,10 +218,7 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
 
         <section className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-5 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
-            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              Withdrawals
-            </h3>
+            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">Withdrawals</h3>
           </div>
           <div className="max-h-[300px] overflow-y-auto divide-y divide-gray-50">
             {payouts.length === 0 ? <p className="text-center text-gray-400 py-10 text-sm">No withdrawals found.</p> : payouts.slice().reverse().map(payout => (
@@ -249,19 +239,18 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
 
       <section className="bg-white p-6 rounded-3xl shadow-sm border border-red-100">
         <h3 className="text-lg font-bold text-gray-900 mb-2">Issue?</h3>
-        <p className="text-sm text-gray-500 mb-4">Report non-payment or other concerns.</p>
         <button onClick={() => setShowComplaintModal(true)} className="bg-red-600 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-lg shadow-red-200">Report to Admin</button>
       </section>
 
-      {/* Modal Overlays */}
+      {/* Referral Modal */}
       {showLeadModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[120] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-[2rem] p-8 space-y-4">
             <h3 className="text-2xl font-bold text-gray-900">Refer a Buyer</h3>
             <form onSubmit={handleLeadSubmit} className="space-y-4">
-              <input placeholder="Buyer Name" className="w-full px-5 py-4 bg-gray-50 border rounded-2xl outline-none" required value={leadData.name} onChange={e => setLeadData({...leadData, name: e.target.value})} />
-              <input placeholder="Buyer Mobile" className="w-full px-5 py-4 bg-gray-50 border rounded-2xl outline-none" required value={leadData.mobile} onChange={e => setLeadData({...leadData, mobile: e.target.value})} />
-              <select className="w-full px-5 py-4 bg-gray-50 border rounded-2xl outline-none" required value={leadData.productId} onChange={e => setLeadData({...leadData, productId: e.target.value})}>
+              <input placeholder="Buyer Name" className="w-full px-5 py-4 bg-gray-50 border rounded-2xl outline-none font-bold" required value={leadData.name} onChange={e => setLeadData({...leadData, name: e.target.value})} />
+              <input placeholder="Buyer Mobile" className="w-full px-5 py-4 bg-gray-50 border rounded-2xl outline-none font-bold" required value={leadData.mobile} onChange={e => setLeadData({...leadData, mobile: e.target.value})} />
+              <select className="w-full px-5 py-4 bg-gray-50 border rounded-2xl outline-none font-bold" required value={leadData.productId} onChange={e => setLeadData({...leadData, productId: e.target.value})}>
                 <option value="">Select Product</option>
                 {products.map(p => <option key={p.id} value={p.id}>{p.brand} {p.name}</option>)}
               </select>
@@ -272,13 +261,14 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
         </div>
       )}
 
+      {/* Complaint Modal */}
       {showComplaintModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[130] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-[2rem] p-8 space-y-4">
             <h3 className="text-2xl font-bold text-gray-900">File a Complaint</h3>
             <form onSubmit={handleComplaintSubmit} className="space-y-4">
-              <input className="w-full px-5 py-4 bg-gray-50 border rounded-2xl outline-none" required value={complaintData.subject} onChange={e => setComplaintData({...complaintData, subject: e.target.value})} />
-              <textarea placeholder="Details..." className="w-full px-5 py-4 bg-gray-50 border rounded-2xl outline-none min-h-[120px]" required value={complaintData.message} onChange={e => setComplaintData({...complaintData, message: e.target.value})} />
+              <input className="w-full px-5 py-4 bg-gray-50 border rounded-2xl outline-none font-bold" required value={complaintData.subject} onChange={e => setComplaintData({...complaintData, subject: e.target.value})} />
+              <textarea placeholder="Details..." className="w-full px-5 py-4 bg-gray-50 border rounded-2xl outline-none min-h-[120px] font-medium" required value={complaintData.message} onChange={e => setComplaintData({...complaintData, message: e.target.value})} />
               <button type="submit" className="w-full bg-red-600 text-white py-4 rounded-2xl font-bold shadow-xl">Submit to Admin</button>
               <button type="button" onClick={() => setShowComplaintModal(false)} className="w-full text-gray-400 py-2">Cancel</button>
             </form>
@@ -286,6 +276,7 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
         </div>
       )}
 
+      {/* View Proof Modal */}
       {viewProof && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[150] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-6 space-y-4">
@@ -294,7 +285,7 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                <img src={viewProof.screenshotUrl} className="w-full h-full object-cover" alt="Payment Proof" />
             </div>
             <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
-              <p className="text-[10px] text-blue-400 font-bold uppercase">Transaction ID</p>
+              <p className="text-[10px] text-blue-400 font-bold uppercase tracking-widest">Transaction ID</p>
               <p className="text-lg font-black text-blue-900 font-mono break-all">{viewProof.transactionId || 'N/A'}</p>
             </div>
             <button onClick={() => setViewProof(null)} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-blue-200">Close</button>
