@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, UserRole, Shop, Product, ReferralSale, PayoutRequest, TransactionStatus, AdminRequest, Lead, Complaint } from './types';
-import { MOCK_USERS, MOCK_SHOPS, INITIAL_ADMIN } from './constants';
+import { MOCK_USERS, MOCK_SHOPS } from './constants';
 import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
 import ShopDashboard from './components/ShopDashboard';
@@ -9,26 +9,46 @@ import CustomerDashboard from './components/CustomerDashboard';
 import Navigation from './components/Navigation';
 
 const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [users, setUsers] = useState<User[]>(MOCK_USERS);
-  const [shops, setShops] = useState<Shop[]>(MOCK_SHOPS);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [sales, setSales] = useState<ReferralSale[]>([]);
-  const [payouts, setPayouts] = useState<PayoutRequest[]>([]);
-  const [adminRequests, setAdminRequests] = useState<AdminRequest[]>([]);
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [complaints, setComplaints] = useState<Complaint[]>([]);
+  // Persistence Helper: Load data from LocalStorage or default to initial values
+  const getInitialData = <T,>(key: string, defaultValue: T): T => {
+    const saved = localStorage.getItem(key);
+    try {
+      return saved ? JSON.parse(saved) : defaultValue;
+    } catch (e) {
+      console.error(`Error loading ${key} from storage`, e);
+      return defaultValue;
+    }
+  };
 
-  // Simulation of persistence
+  const [users, setUsers] = useState<User[]>(() => getInitialData('rfm_users', MOCK_USERS));
+  const [shops, setShops] = useState<Shop[]>(() => getInitialData('rfm_shops', MOCK_SHOPS));
+  const [products, setProducts] = useState<Product[]>(() => getInitialData('rfm_products', []));
+  const [sales, setSales] = useState<ReferralSale[]>(() => getInitialData('rfm_sales', []));
+  const [payouts, setPayouts] = useState<PayoutRequest[]>(() => getInitialData('rfm_payouts', []));
+  const [adminRequests, setAdminRequests] = useState<AdminRequest[]>(() => getInitialData('rfm_requests', []));
+  const [leads, setLeads] = useState<Lead[]>(() => getInitialData('rfm_leads', []));
+  const [complaints, setComplaints] = useState<Complaint[]>(() => getInitialData('rfm_complaints', []));
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  // Sync session (logged in user)
   useEffect(() => {
-    const saved = localStorage.getItem('refmobile_user');
+    const saved = localStorage.getItem('rfm_session');
     if (saved) {
       const parsedUser = JSON.parse(saved);
-      // Ensure we have the latest user data from the state
       const latestUser = users.find(u => u.id === parsedUser.id);
       if (latestUser) setCurrentUser(latestUser);
     }
   }, [users]);
+
+  // Effect hooks to automatically save state changes to LocalStorage
+  useEffect(() => { localStorage.setItem('rfm_users', JSON.stringify(users)); }, [users]);
+  useEffect(() => { localStorage.setItem('rfm_shops', JSON.stringify(shops)); }, [shops]);
+  useEffect(() => { localStorage.setItem('rfm_products', JSON.stringify(products)); }, [products]);
+  useEffect(() => { localStorage.setItem('rfm_sales', JSON.stringify(sales)); }, [sales]);
+  useEffect(() => { localStorage.setItem('rfm_payouts', JSON.stringify(payouts)); }, [payouts]);
+  useEffect(() => { localStorage.setItem('rfm_requests', JSON.stringify(adminRequests)); }, [adminRequests]);
+  useEffect(() => { localStorage.setItem('rfm_leads', JSON.stringify(leads)); }, [leads]);
+  useEffect(() => { localStorage.setItem('rfm_complaints', JSON.stringify(complaints)); }, [complaints]);
 
   const handleLogin = (identifier: string, role: UserRole, password?: string) => {
     const user = users.find(u => {
@@ -43,17 +63,15 @@ const App: React.FC = () => {
 
     if (user) {
       setCurrentUser(user);
-      localStorage.setItem('refmobile_user', JSON.stringify(user));
+      localStorage.setItem('rfm_session', JSON.stringify(user));
     } else {
-      let msg = 'Invalid credentials';
-      if (role === UserRole.CUSTOMER) msg = 'Invalid mobile number';
-      alert(msg);
+      alert(role === UserRole.CUSTOMER ? 'Invalid mobile number' : 'Invalid credentials');
     }
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
-    localStorage.removeItem('refmobile_user');
+    localStorage.removeItem('rfm_session');
   };
 
   const registerShop = (shopData: Partial<Shop> & { ownerName: string, mobile: string, password?: string, gstCertificatePhoto: string, shopPhoto: string, ownerSelfiePhoto: string }) => {
@@ -76,7 +94,7 @@ const App: React.FC = () => {
       address: shopData.address || '',
       gstNumber: shopData.gstNumber || '',
       isApproved: false,
-      adminCommissionRate: 0.05, // Updated default to 5%
+      adminCommissionRate: 0.05,
       gstCertificatePhoto: shopData.gstCertificatePhoto,
       shopPhoto: shopData.shopPhoto,
       ownerSelfiePhoto: shopData.ownerSelfiePhoto
@@ -98,17 +116,11 @@ const App: React.FC = () => {
       case UserRole.ADMIN:
         return (
           <AdminDashboard 
-            shops={shops} 
-            setShops={setShops} 
-            sales={sales} 
-            payouts={payouts} 
-            setPayouts={setPayouts}
-            adminRequests={adminRequests}
-            setAdminRequests={setAdminRequests}
-            complaints={complaints}
-            setComplaints={setComplaints}
-            users={users}
-            setUsers={setUsers}
+            shops={shops} setShops={setShops} 
+            sales={sales} payouts={payouts} setPayouts={setPayouts}
+            adminRequests={adminRequests} setAdminRequests={setAdminRequests}
+            complaints={complaints} setComplaints={setComplaints}
+            users={users} setUsers={setUsers}
             onResetPassword={resetUserPassword}
           />
         );
@@ -120,50 +132,37 @@ const App: React.FC = () => {
               <div className="w-16 h-16 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center mb-4">
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               </div>
-              <h2 className="text-xl font-bold text-gray-800">Shop Pending Approval</h2>
-              <p className="text-gray-500 mt-2">The administrator is reviewing your application. Please check back later.</p>
-              <button onClick={handleLogout} className="mt-6 text-blue-600 font-medium">Log out</button>
+              <h2 className="text-xl font-bold text-gray-800 uppercase tracking-tighter">Approval Pending</h2>
+              <p className="text-gray-500 mt-2 text-sm">Admin is verifying your documents. Please check back later.</p>
+              <button onClick={handleLogout} className="mt-6 text-indigo-600 font-black uppercase text-xs">Log out</button>
             </div>
           );
         }
         return (
           <ShopDashboard 
-            shop={myShop} 
-            setShops={setShops}
-            products={products.filter(p => p.shopId === myShop.id)}
-            setProducts={setProducts}
-            sales={sales.filter(s => s.shopId === myShop.id)}
-            setSales={setSales}
-            payouts={payouts.filter(p => p.shopId === myShop.id)}
-            setPayouts={setPayouts}
-            users={users.filter(u => u.shopId === myShop.id && u.role === UserRole.CUSTOMER)}
-            setUsers={setUsers}
-            adminRequests={adminRequests.filter(r => r.shopId === myShop.id)}
-            setAdminRequests={setAdminRequests}
-            leads={leads.filter(l => l.shopId === myShop.id)}
-            setLeads={setLeads}
+            shop={myShop} setShops={setShops}
+            products={products.filter(p => p.shopId === myShop.id)} setProducts={setProducts}
+            sales={sales.filter(s => s.shopId === myShop.id)} setSales={setSales}
+            payouts={payouts.filter(p => p.shopId === myShop.id)} setPayouts={setPayouts}
+            users={users.filter(u => u.shopId === myShop.id && u.role === UserRole.CUSTOMER)} setUsers={setUsers}
+            adminRequests={adminRequests.filter(r => r.shopId === myShop.id)} setAdminRequests={setAdminRequests}
+            leads={leads.filter(l => l.shopId === myShop.id)} setLeads={setLeads}
           />
         );
       case UserRole.CUSTOMER:
         const custShop = shops.find(s => s.id === currentUser.shopId);
         return (
           <CustomerDashboard 
-            currentUser={currentUser} 
-            shop={custShop}
+            currentUser={currentUser} shop={custShop}
             products={products.filter(p => p.shopId === currentUser.shopId)}
             sales={sales.filter(s => s.referrerId === currentUser.id)}
-            payouts={payouts.filter(p => p.userId === currentUser.id)}
-            setPayouts={setPayouts}
-            setUsers={setUsers}
-            users={users}
-            leads={leads.filter(l => l.customerId === currentUser.id)}
-            setLeads={setLeads}
-            complaints={complaints.filter(c => c.customerId === currentUser.id)}
-            setComplaints={setComplaints}
+            payouts={payouts.filter(p => p.userId === currentUser.id)} setPayouts={setPayouts}
+            setUsers={setUsers} users={users}
+            leads={leads.filter(l => l.customerId === currentUser.id)} setLeads={setLeads}
+            complaints={complaints.filter(c => c.customerId === currentUser.id)} setComplaints={setComplaints}
           />
         );
-      default:
-        return null;
+      default: return null;
     }
   };
 

@@ -80,7 +80,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         type: 'SHOP_TO_ADMIN_PAYOUT'
       };
       setPayouts(prev => [...prev, payout]);
-      alert('Withdrawal request initiated! Shop owner will see this in their pending payouts.');
+      alert('Withdrawal request initiated!');
     } else {
       const req: AdminRequest = {
         id: `req-${Date.now()}`,
@@ -105,10 +105,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const callCustomer = (mobile?: string) => {
-    if (mobile) {
-      window.location.href = `tel:${mobile}`;
-    } else {
-      alert("Mobile number not available");
+    if (mobile) window.location.href = `tel:${mobile}`;
+    else alert("Mobile number not available");
+  };
+
+  const clearAllData = () => {
+    if (window.confirm("CAUTION: This will delete ALL registered shops, users, and transactions from this browser. Continue?")) {
+      localStorage.clear();
+      window.location.reload();
     }
   };
 
@@ -123,18 +127,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   return (
     <div className="space-y-6 pb-20">
-      <header>
-        <h1 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Master Admin</h1>
-        <p className="text-gray-500 text-sm font-medium mt-1">Network Management Console</p>
+      <header className="flex justify-between items-start">
+        <div>
+          <h1 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Master Admin</h1>
+          <p className="text-gray-500 text-sm font-medium mt-1">Network Management Console</p>
+        </div>
+        <div className="flex flex-col items-end gap-2">
+           <span className="text-[10px] font-black text-green-600 bg-green-50 px-2 py-1 rounded-lg border border-green-100 uppercase animate-pulse">● System Cloud Sync Active</span>
+           <button onClick={clearAllData} className="text-[10px] font-black text-red-400 hover:text-red-600 uppercase tracking-widest">Wipe Data</button>
+        </div>
       </header>
 
       <div className="flex flex-col lg:flex-row gap-6">
-        {/* Left Side: Activity / Global Directory */}
         <aside className="lg:w-1/3 space-y-6">
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex flex-col max-h-[600px]">
             <div className="p-5 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
               <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Network Activity</h3>
-              <span className="text-[10px] bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full font-black uppercase">Recent</span>
+              <span className="text-[10px] bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full font-black uppercase">Live</span>
             </div>
             <div className="flex-grow overflow-y-auto p-4 space-y-3">
               {customerPayouts.length === 0 ? (
@@ -179,10 +188,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <span className="text-[9px] font-black uppercase px-1">Call</span>
                         </button>
                       </div>
-                      <div className="mt-3 pt-3 border-t border-gray-50 flex justify-between items-center">
-                         <p className="text-[8px] font-mono text-gray-400">{payout.upiId}</p>
-                         <p className="text-[8px] text-gray-300 font-bold">{new Date(payout.timestamp).toLocaleDateString()}</p>
-                      </div>
                     </div>
                   );
                 })
@@ -191,23 +196,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
 
           <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm space-y-4">
-             <h3 className="text-sm font-black text-gray-800 uppercase tracking-widest">Master Stats</h3>
+             <h3 className="text-sm font-black text-gray-800 uppercase tracking-widest">Storage Status</h3>
              <div className="grid grid-cols-2 gap-3">
                <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100 text-center">
-                 <p className="text-[10px] font-black text-gray-400 uppercase">Customers</p>
-                 <p className="text-xl font-black text-indigo-600">{stats.totalCustomers}</p>
+                 <p className="text-[10px] font-black text-gray-400 uppercase">Records</p>
+                 <p className="text-xl font-black text-indigo-600">{users.length + shops.length + sales.length}</p>
                </div>
                <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100 text-center">
-                 <p className="text-[10px] font-black text-gray-400 uppercase">Revenue</p>
-                 <p className="text-xl font-black text-green-600">₹{stats.totalRevenue.toLocaleString()}</p>
+                 <p className="text-[10px] font-black text-gray-400 uppercase">Shops</p>
+                 <p className="text-xl font-black text-green-600">{shops.length}</p>
                </div>
              </div>
           </div>
         </aside>
 
-        {/* Right Side: Tabbed Management Panels */}
         <main className="lg:w-2/3 space-y-8">
-          {/* Shop Management Table */}
           <section className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-6 border-b border-gray-50 flex justify-between items-center">
               <h3 className="text-lg font-black text-gray-800 uppercase tracking-tighter">Partner Shops</h3>
@@ -219,7 +222,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <th className="px-6 py-4">Shop</th>
                     <th className="px-6 py-4 text-center">Docs</th>
                     <th className="px-6 py-4 text-center">Comm%</th>
-                    <th className="px-6 py-4 text-right">Income</th>
                     <th className="px-6 py-4 text-right">Unpaid</th>
                     <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
@@ -249,9 +251,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           </select>
                         </td>
                         <td className="px-6 py-4 text-right">
-                           <p className="text-sm font-black text-indigo-600">₹{getShopAdminIncome(shop.id).toLocaleString()}</p>
-                        </td>
-                        <td className="px-6 py-4 text-right">
                            <p className={`text-sm font-black ${unpaid > 0 ? 'text-red-600' : 'text-gray-400'}`}>₹{unpaid.toLocaleString()}</p>
                         </td>
                         <td className="px-6 py-4 text-right">
@@ -276,7 +275,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </section>
 
-          {/* Customer Management Directory */}
           <section className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-6 border-b border-gray-50 space-y-4">
               <div className="flex justify-between items-center">
@@ -300,60 +298,37 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <tr>
                     <th className="px-6 py-4">Customer Details</th>
                     <th className="px-6 py-4">Shop Link</th>
-                    <th className="px-6 py-4 text-right">Referral Stats</th>
                     <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {filteredCustomers.length === 0 ? (
-                    <tr><td colSpan={4} className="px-6 py-10 text-center text-gray-400 text-sm italic">No customers found matching search.</td></tr>
-                  ) : (
-                    filteredCustomers.map(customer => {
-                      const shop = shops.find(s => s.id === customer.shopId);
-                      const customerSales = sales.filter(s => s.referrerId === customer.id);
-                      const earnings = customerSales.reduce((acc, s) => acc + s.customerCommissionEarned, 0);
-                      return (
-                        <tr key={customer.id} className="hover:bg-gray-50/50">
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-black text-xs uppercase">
-                                {customer.name.charAt(0)}
-                              </div>
-                              <div>
-                                <p className="font-bold text-gray-900 text-sm leading-tight">{customer.name}</p>
-                                <p className="text-[10px] text-gray-500 font-bold uppercase">{customer.mobile}</p>
-                                <p className="text-[10px] text-indigo-500 font-black tracking-widest uppercase mt-0.5">ID: {customer.referralCode}</p>
-                              </div>
+                  {filteredCustomers.map(customer => {
+                    const shop = shops.find(s => s.id === customer.shopId);
+                    return (
+                      <tr key={customer.id} className="hover:bg-gray-50/50">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-black text-xs uppercase">
+                              {customer.name.charAt(0)}
                             </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <p className="text-xs font-bold text-gray-700">{shop?.shopName || 'N/A'}</p>
-                            <p className="text-[10px] text-gray-400 uppercase font-black">{shop?.gstNumber || 'Direct Network'}</p>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                             <p className="text-sm font-black text-green-600">₹{earnings.toLocaleString()}</p>
-                             <p className="text-[10px] text-gray-400 font-black uppercase">{customerSales.length} Sales</p>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                             <div className="flex justify-end gap-3">
-                               <button 
-                                 onClick={() => callCustomer(customer.mobile)}
-                                 className="text-[10px] font-black text-indigo-600 uppercase hover:underline"
-                               >
-                                 Call
-                               </button>
-                               <button 
-                                 onClick={() => setResetModal({ isOpen: true, userId: customer.id, ownerName: customer.name })}
-                                 className="text-[10px] font-black text-amber-600 uppercase hover:underline"
-                               >
-                                 Reset Pass
-                               </button>
-                             </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
+                            <div>
+                              <p className="font-bold text-gray-900 text-sm leading-tight">{customer.name}</p>
+                              <p className="text-[10px] text-gray-500 font-bold uppercase">{customer.mobile}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="text-xs font-bold text-gray-700">{shop?.shopName || 'N/A'}</p>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                           <div className="flex justify-end gap-3">
+                             <button onClick={() => callCustomer(customer.mobile)} className="text-[10px] font-black text-indigo-600 uppercase">Call</button>
+                             <button onClick={() => setResetModal({ isOpen: true, userId: customer.id, ownerName: customer.name })} className="text-[10px] font-black text-amber-600 uppercase">Reset Pass</button>
+                           </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -367,32 +342,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 space-y-6 shadow-2xl">
             <h3 className="text-xl font-black text-gray-900 tracking-tighter uppercase">{requestModal.type === 'WITHDRAWAL' ? 'Confirm Payout Request' : 'Send Request'}</h3>
             <form onSubmit={handleSendRequest} className="space-y-4">
-              {requestModal.type === 'GENERAL' ? (
-                <>
-                  <input className="w-full px-5 py-4 bg-gray-50 border rounded-2xl outline-none font-bold" placeholder="Subject" required value={newReq.title} onChange={e => setNewReq({ ...newReq, title: e.target.value })} />
-                  <textarea className="w-full px-5 py-4 bg-gray-50 border rounded-2xl outline-none font-medium min-h-[100px]" placeholder="Message..." required value={newReq.message} onChange={e => setNewReq({ ...newReq, message: e.target.value })} />
-                </>
-              ) : (
+              {requestModal.type === 'WITHDRAWAL' && (
                 <>
                   <div className="bg-indigo-50 p-6 rounded-2xl border border-indigo-100 text-center">
                     <p className="text-xs font-black text-indigo-400 uppercase tracking-widest mb-1">Requesting</p>
                     <p className="text-4xl font-black text-indigo-600">₹{getShopPendingAdminPayout(requestModal.shopId).toLocaleString()}</p>
                     <p className="text-[10px] font-bold text-indigo-400 mt-2 uppercase">From {shops.find(s => s.id === requestModal.shopId)?.shopName}</p>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Your Admin UPI ID</label>
-                    <input 
-                      className="w-full px-5 py-4 bg-gray-50 border rounded-2xl outline-none font-bold" 
-                      placeholder="e.g. admin@upi" 
-                      required 
-                      value={adminUpi} 
-                      onChange={e => setAdminUpi(e.target.value)} 
-                    />
-                  </div>
+                  <input className="w-full px-5 py-4 bg-gray-50 border rounded-2xl outline-none font-bold" placeholder="Your UPI ID" required value={adminUpi} onChange={e => setAdminUpi(e.target.value)} />
                 </>
               )}
               <div className="flex gap-3 pt-2">
-                <button type="submit" className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-indigo-100">Send Request</button>
+                <button type="submit" className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-indigo-100">Send</button>
                 <button type="button" onClick={() => setRequestModal({ isOpen: false, shopId: '', type: 'GENERAL' })} className="flex-1 bg-gray-100 text-gray-600 py-4 rounded-2xl font-bold uppercase tracking-widest text-xs">Cancel</button>
               </div>
             </form>
@@ -404,20 +365,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {resetModal.isOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 space-y-6 shadow-2xl">
-            <h3 className="text-xl font-black text-gray-900 uppercase">Reset Account Password</h3>
+            <h3 className="text-xl font-black text-gray-900 uppercase">Reset Password</h3>
             <p className="text-xs text-gray-500 font-bold uppercase">Target: {resetModal.ownerName}</p>
             <form onSubmit={handleResetPassword} className="space-y-4">
-              <input 
-                type="password"
-                className="w-full px-5 py-4 bg-gray-50 border rounded-2xl outline-none font-bold shadow-inner" 
-                placeholder="Enter New Password" 
-                required 
-                value={newPassword} 
-                onChange={e => setNewPassword(e.target.value)} 
-              />
+              <input type="password" className="w-full px-5 py-4 bg-gray-50 border rounded-2xl outline-none font-bold" placeholder="New Password" required value={newPassword} onChange={e => setNewPassword(e.target.value)} />
               <div className="flex gap-3">
-                <button type="submit" className="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-blue-100">Save New Password</button>
-                <button type="button" onClick={() => { setResetModal({ isOpen: false, userId: '', ownerName: '' }); setNewPassword(''); }} className="flex-1 bg-gray-100 text-gray-600 py-4 rounded-2xl font-bold uppercase tracking-widest text-xs">Cancel</button>
+                <button type="submit" className="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-blue-100">Save</button>
+                <button type="button" onClick={() => setResetModal({ isOpen: false, userId: '', ownerName: '' })} className="flex-1 bg-gray-100 text-gray-600 py-4 rounded-2xl font-bold uppercase tracking-widest text-xs">Back</button>
               </div>
             </form>
           </div>
@@ -436,16 +390,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
-                { title: 'GSTIN Certificate', key: 'gstCertificatePhoto' },
-                { title: 'Shop Front Image', key: 'shopPhoto' },
-                { title: 'Owner Identity Selfie', key: 'ownerSelfiePhoto' }
+                { title: 'GST Certificate', key: 'gstCertificatePhoto' },
+                { title: 'Shop Photo', key: 'shopPhoto' },
+                { title: 'Identity Photo', key: 'ownerSelfiePhoto' }
               ].map((doc, i) => (
                 <div key={i} className="space-y-2">
                   <p className="text-center font-black text-[10px] text-gray-400 uppercase tracking-widest">{doc.title}</p>
                   <div className="aspect-[4/5] rounded-3xl bg-gray-100 overflow-hidden border shadow-inner">
                     {docModal.shop?.[doc.key as keyof Shop] ? (
                       <img src={docModal.shop![doc.key as keyof Shop] as string} className="w-full h-full object-cover" />
-                    ) : <div className="flex items-center justify-center h-full text-gray-300 font-bold uppercase text-[10px]">Document Missing</div>}
+                    ) : <div className="flex items-center justify-center h-full text-gray-300 font-bold uppercase text-[10px]">Missing</div>}
                   </div>
                 </div>
               ))}
@@ -455,7 +409,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 onClick={() => { toggleApproval(docModal.shop!.id); setDocModal({ isOpen: false, shop: null }); }}
                 className="w-full mt-8 bg-green-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-green-100"
               >
-                Approve Shop Registration
+                Approve Shop
               </button>
             )}
           </div>
